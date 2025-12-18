@@ -25,9 +25,9 @@
     "build": "rm -rf dist/*; tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
@@ -36,7 +36,8 @@
     "prepare": "husky",
     "docs": "typedoc",
     "docs:serve": "typedoc && npx http-server docs/api -o",
-    "docs:watch": "typedoc --watch"
+    "docs:watch": "typedoc --watch",
+    "vim:tdd": "vim -S .tdd.vim"
   },
   "lint-staged": {
     "*.ts": [
@@ -57,6 +58,7 @@
     "jest": "^30.2.0",
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
+    "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.15",
     "typescript": "^5.9.3"
