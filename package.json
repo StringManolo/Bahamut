@@ -33,7 +33,10 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "type-check": "tsc --noEmit",
     "push": "node utils/push.js",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docs": "typedoc",
+    "docs:serve": "typedoc && npx http-server docs/api -o",
+    "docs:watch": "typedoc --watch"
   },
   "lint-staged": {
     "*.ts": [
@@ -55,6 +58,7 @@
     "lint-staged": "^16.2.7",
     "prettier": "^3.7.4",
     "ts-node": "^10.9.2",
+    "typedoc": "^0.28.15",
     "typescript": "^5.9.3"
   },
   "dependencies": {

@@ -1,14 +1,39 @@
 #!/usr/bin/env node
 
+/**
+ * Bahamut Scanner - Command Line Interface
+ * 
+ * Main CLI entry point for the vulnerability scanner
+ * @module CLI
+ * @group CLI
+ */
+
 import parseCLI from "simpleargumentsparser";
 
+/**
+ * Current version of Bahamut Scanner
+ * @group CLI
+ * @public
+ */
 export const version = '1.0.0';
 
+/**
+ * Configuration options for the scanner
+ * @group CLI
+ * @interface Config
+ */
 interface Config {
+  /** Target URL to scan for vulnerabilities */
   target: string;
+  /** Enable verbose output mode */
   verbose: boolean;
 }
 
+/**
+ * Displays the help menu with usage instructions and examples
+ * @group CLI
+ * @internal
+ */
 function showHelp(): void {
   console.log(`
 Bahamut Help Menu
@@ -28,10 +53,52 @@ Examples:
 `);
 }
 
+/**
+ * Displays the current version of Bahamut Scanner
+ * @group CLI
+ * @internal
+ */
 function showVersion(): void {
   console.log(`Bahamut Scanner v${version}`);
 }
 
+/**
+ * Main CLI entry point for Bahamut Scanner
+ * 
+ * Parses command-line arguments and executes the vulnerability scanning process.
+ * Handles help display, version display, and target validation before scanning.
+ * 
+ * @group CLI
+ * @returns Promise that resolves when scanning completes or help/version is displayed
+ * @throws {Error} Exits with code 1 if target is missing or invalid
+ * 
+ * @example
+ * Display help
+ * ```bash
+ * bahamut --help
+ * bahamut -h
+ * ```
+ * 
+ * @example
+ * Show version
+ * ```bash
+ * bahamut --version
+ * ```
+ * 
+ * @example
+ * Basic scan
+ * ```bash
+ * bahamut --target https://example.com
+ * ```
+ * 
+ * @example
+ * Verbose scan
+ * ```bash
+ * bahamut --target https://example.com -v
+ * ```
+ * 
+ * @public
+ */
 export async function main(): Promise<void> {
   const cli = await parseCLI();
   
