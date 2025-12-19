@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "engine",
+  "modules/*",
+  "private_modules/*",
+]
+resolver = "2"
