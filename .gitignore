@@ -4,4 +4,4 @@ private_modules/*
 
 !private_modules/xss_scanner/
 private_modules/xss_scanner/*
-!private_modules/xss_scanner/.gitkeep
+!private_modules/xss_scanner/README.md
