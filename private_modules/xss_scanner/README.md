@@ -21,4 +21,4 @@ This directory contains a **Commercial Module** for the Bahamut Engine. The sour
 
 ---
 #### 🛡️ Bahamut Security Engine
-*Providing high-performance security auditing since 2025.*
+*Providing high-performance security auditing since 2026.*
