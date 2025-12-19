@@ -1,3 +1,7 @@
 /target
-private_modules/**
-!private_modules/**/.gitkeep
+
+private_modules/*
+
+!private_modules/xss_scanner/
+private_modules/xss_scanner/*
+!private_modules/xss_scanner/.gitkeep
