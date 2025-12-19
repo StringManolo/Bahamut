@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "bahamut-core",
   "engine",
   "modules/*",
   "private_modules/*",

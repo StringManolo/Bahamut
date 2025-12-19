@@ -3,4 +3,14 @@ name = "bahamut"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "bahamut"
+path = "src/main.rs"
+
 [dependencies]
+anyhow = "1.0"
+simpleargumentsparser = "2.1.0"
+bahamut-core = { version = "0.1.0", path = "../bahamut-core" }
+domain_fetcher = { version = "0.1.0", path = "../modules/domain_fetcher" }
+open_redir_scanner = { path = "../modules/open_redir_scanner" }
+reports = { path = "../modules/reports" }
