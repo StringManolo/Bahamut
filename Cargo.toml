@@ -1,8 +1,0 @@
-[workspace]
-members = [
-  "bahamut-core",
-  "engine",
-  "modules/*",
-  "private_modules/*",
-]
-resolver = "2"
