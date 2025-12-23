@@ -5,6 +5,13 @@
 
 CLI cli;
 
+void Verbose(std::string msg);
+void Debug(std::string msg);
+void Warning(std::string msg);
+void Error(std::string msg);
+void Exit(std::string msg);
+
+
 int main(int argc, char* argv[]) {
   cli = parseCLI(argc, argv);
   bool verbose = false;
@@ -31,6 +38,29 @@ int main(int argc, char* argv[]) {
     debug = true;
   }
 
+  if (cli.o.size() > 0 && cli.o[0].first == "list") {
+    Verbose("list detected");
+    if (cli.o.size() > 1 && cli.o[1].first == "modules") {
+      Verbose("Listing modules: ");
+      listModules();
+    }
+  } else if (cli.o.size() > 0 && cli.o[0].first == "run") {
+    std::string target = cli.c["module"].toString();
+    std::vector<std::string> extraArgs;
+
+    for (size_t i = 1; i < cli.o.size(); ++i) {
+        extraArgs.push_back(cli.o[i].first);
+    }
+
+    if (target == "all") {
+        Verbose("Running all modules...");
+        runModules(extraArgs);
+    } else if (!target.empty()) {
+        runModule(target, extraArgs);
+    } else {
+        Error("Usage: run --module [name|all]");
+    }
+}
 
   return 0;
 }
