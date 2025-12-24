@@ -11,6 +11,10 @@ make
 ./bahamut
 ```
 
+## Optional Dependencies
+#### Chafa
+If chafa is installed, a cool image is displayed directly in the terminal when running the command bahamut.
+
 ## APIs
 
 ### Multilanguage Modules
