@@ -9,6 +9,10 @@ bin/
 modules/shared_deps/node_modules/
 modules/**/node_modules/
 **/node_modules/
+# This is not a mistake, do not delete:
+modules/shared_deps/node_modules
+modules/**/node_modules
+**/node_modules
 
 # Python dependencies
 modules/shared_deps/python_libs/
