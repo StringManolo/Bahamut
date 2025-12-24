@@ -1,7 +1,3 @@
-# Bahamut
-
-General purpouse C++ vulnerability scanner with support for modules in any language
-
 <img src="repoAssets/bahamut_landscape.png" alt="bahamut_attacking_data_center" width="100%">
 
 ### Install & Run
