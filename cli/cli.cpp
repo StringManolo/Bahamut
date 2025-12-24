@@ -12,6 +12,7 @@ void Warning(std::string msg);
 void Error(std::string msg);
 void Exit(std::string msg);
 void ShowHelp();
+bool PrintLogo(const std::string& path);
 
 int main(int argc, char* argv[]) {
   cli = parseCLI(argc, argv);
@@ -19,7 +20,9 @@ int main(int argc, char* argv[]) {
   bool debug = cli.s["d"] || cli.c["debug"];
 
   if (cli.c["version"]) {
-    std::cout << cli.color["bold"]["magenta"]("Bahamut Engine v1.0.0") << std::endl;
+    PrintLogo("repoAssets/bahamut_landscape.png");
+    std::cout << std::endl;
+    std::cout << cli.color["bold"]["red"]("Bahamut V1.0.0") << std::endl;
     return 0;
   }
 
@@ -86,7 +89,10 @@ void ShowHelp() {
   auto cyan = cli.color["cyan"];
   auto dim = cli.color["dim"];
 
-  std::cout << "\n" << bold["cyan"]("BAHAMUT") << " - Modular Hacking Orchestrator\n" << std::endl;
+  std::cout << "\n" << "" << bold["red"]("BAHAMUT") << " - Modular Hacking Orchestrator\n" << std::endl;
+
+  PrintLogo("repoAssets/bahamut_landscape.png -s 80x27");
+  std::cout << std::endl;
   std::cout << bold["white"]("USAGE:") << std::endl;
   std::cout << "  ./bahamut [command] [arguments]\n" << std::endl;
 
@@ -130,4 +136,13 @@ void Error(std::string msg) {
 void Exit(std::string msg) {
   std::cout << msg << std::endl;
   std::exit(0);
+}
+
+bool PrintLogo(const std::string& path) {
+  if (system("command -v chafa > /dev/null 2>&1") == 0) {
+    std::string command = "chafa " + path + " 2>/dev/null";
+    system(command.c_str());
+    return true;
+  }
+  return false;
 }
