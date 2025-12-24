@@ -13,7 +13,7 @@ make
 
 ## Optional Dependencies
 #### Chafa
-If chafa is installed, a cool image is displayed directly in the terminal when running the command bahamut.
+If `chafa` is installed, Bahamut will render a graphical logo directly in the terminal on startup.
 
 ## APIs
 
