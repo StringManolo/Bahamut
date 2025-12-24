@@ -11,8 +11,6 @@ make
 ./bahamut
 ```
 
-### DOCS
-[DOCS here](docs/DOCU.md)
-
-### TODO
-[TODO here](docs/TODO.md)
+<h3 align="center">
+  <a href="docs/DOCU.md">DOCS here</a> | <a href="docs/TODO.md">TODO here</a>
+</h3>
