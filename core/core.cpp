@@ -54,10 +54,10 @@ std::vector<std::string> getModules() {
   return modules;
 }
 
-void runModule(const std::string& moduleName, const std::vector<std::string>& args) {
+void installModule(std::string moduleName) {
   std::string fullPath = findModulePath(moduleName);
   if (fullPath.empty()) {
-    std::cout << "Error: Module " << moduleName << " not found." << std::endl;
+    std::cout << "[-] Error: Module " << moduleName << " not found." << std::endl;
     return;
   }
 
@@ -81,40 +81,153 @@ void runModule(const std::string& moduleName, const std::vector<std::string>& ar
     file.close();
   }
 
-  std::string sourceNodeDir, targetDir;
-  if (scope == "isolated") {
-    targetDir = moduleDir;
+  if (installCmd.empty()) {
+    std::cout << "[!] No installation command found for " << moduleName << std::endl;
+    return;
+  }
+
+  std::string finalInstall;
+  
+  if (scope == "global") {
+    // Si es global, usamos npm install -g y no necesitamos crear carpetas locales
+    finalInstall = installCmd + " -g";
+  } else {
+    std::string targetDir = (scope == "isolated") ? moduleDir : SHARED_DEPS;
+    fs::create_directories(targetDir);
+    if (fullPath.ends_with(".js")) ensurePackageJson(targetDir);
+    
+    finalInstall = "cd " + targetDir + " && " + installCmd + " --silent";
+    if (fullPath.ends_with(".py")) finalInstall += " --target=./python_libs";
+  }
+
+  std::cout << "[+] Installing dependencies (" << scope << ")..." << std::endl;
+  std::system(finalInstall.c_str());
+}
+
+void uninstallModule(std::string moduleName) {
+  std::string fullPath = findModulePath(moduleName);
+  if (fullPath.empty()) {
+    std::cout << "[-] Error: Module " << moduleName << " not found." << std::endl;
+    return;
+  }
+
+  std::string moduleDir = fs::path(fullPath).parent_path().string();
+  std::string scope = "shared";
+
+  std::ifstream file(fullPath);
+  if (file.is_open()) {
+    std::string line;
+    while (std::getline(file, line)) {
+      if (line.find("InstallScope:") != std::string::npos) {
+        if (line.find("isolated") != std::string::npos) scope = "isolated";
+      }
+    }
+    file.close();
+  }
+
+  try {
+    if (scope == "isolated") {
+      std::cout << "[+] Removing isolated dependencies in: " << moduleDir << std::endl;
+      fs::remove_all(moduleDir + "/node_modules");
+      fs::remove_all(moduleDir + "/python_libs");
+      fs::remove(moduleDir + "/package.json");
+    } else {
+      std::cout << "[+] Removing local symlink for: " << moduleName << std::endl;
+      fs::remove(moduleDir + "/node_modules");
+    }
+    std::cout << "[+] Done." << std::endl;
+  } catch (const std::exception& e) {
+    std::cout << "[-] Uninstall error: " << e.what() << std::endl;
+  }
+}
+
+void purgeSharedDeps() {
+  std::cout << "[!] Purging all shared dependencies in " << SHARED_DEPS << "..." << std::endl;
+  try {
+    if (fs::exists(SHARED_DEPS)) {
+      fs::remove_all(SHARED_DEPS);
+      std::cout << "[+] Shared directory purged." << std::endl;
+    }
+    
+    for (const auto& entry : fs::recursive_directory_iterator(MODULES_ROOT)) {
+      if (entry.is_directory() && entry.path().filename() == "node_modules") {
+        if (fs::is_symlink(entry.path())) {
+          fs::remove(entry.path());
+        }
+      }
+    }
+    std::cout << "[+] All shared symlinks cleared." << std::endl;
+  } catch (const std::exception& e) {
+    std::cout << "[-] Purge error: " << e.what() << std::endl;
+  }
+}
+
+void runModule(const std::string& moduleName, const std::vector<std::string>& args) {
+  std::string fullPath = findModulePath(moduleName);
+  if (fullPath.empty()) {
+    std::cout << "[-] Error: Module " << moduleName << " not found." << std::endl;
+    return;
+  }
+
+  std::string moduleDir = fs::path(fullPath).parent_path().string();
+  std::string scope = "shared";
+  std::string installCmd = "";
+
+  std::ifstream file(fullPath);
+  if (file.is_open()) {
+    std::string line;
+    while (std::getline(file, line)) {
+      if (line.find("InstallScope:") != std::string::npos) {
+        if (line.find("isolated") != std::string::npos) scope = "isolated";
+        else if (line.find("global") != std::string::npos) scope = "global";
+      }
+      if (line.find("Install:") != std::string::npos) {
+        installCmd = line.substr(line.find("Install:") + 8);
+        installCmd.erase(0, installCmd.find_first_not_of(" \t"));
+      }
+    }
+    file.close();
+  }
+
+  std::string sourceNodeDir;
+  
+  if (scope == "global") {
+    if (fs::exists("/usr/local/lib/node_modules")) sourceNodeDir = "/usr/local/lib/node_modules";
+    else if (fs::exists("/usr/lib/node_modules")) sourceNodeDir = "/usr/lib/node_modules";
+    
+    if (sourceNodeDir.empty()) {
+      char buffer[128];
+      std::unique_ptr<FILE, decltype(&pclose)> pipe(popen("npm root -g", "r"), pclose);
+      if (pipe && fgets(buffer, sizeof(buffer), pipe.get())) {
+        sourceNodeDir = buffer;
+        if (!sourceNodeDir.empty() && sourceNodeDir.back() == '\n') sourceNodeDir.pop_back();
+      }
+    }
+  } else if (scope == "isolated") {
     sourceNodeDir = moduleDir + "/node_modules";
-  } else if (scope == "shared") {
+  } else {
     fs::create_directories(SHARED_DEPS);
-    targetDir = SHARED_DEPS;
     sourceNodeDir = SHARED_DEPS + "/node_modules";
   }
 
   if (!installCmd.empty() && scope != "global") {
-    if (!fs::exists(sourceNodeDir)) {
-      fs::create_directories(targetDir);
-      if (fullPath.ends_with(".js")) ensurePackageJson(targetDir);
-      
-      std::string finalInstall = "cd " + targetDir + " && " + installCmd + " --silent";
-      if (fullPath.ends_with(".py")) finalInstall += " --target=./python_libs";
-      
-      std::cout << "Installing dependencies (" << scope << ")..." << std::endl;
-      std::system(finalInstall.c_str());
-    }
+    if (!fs::exists(sourceNodeDir)) installModule(moduleName);
   }
 
-  if (fullPath.ends_with(".js") && scope == "shared") {
+  if (fullPath.ends_with(".js") && (scope == "shared" || scope == "global")) {
     std::string localSymlink = moduleDir + "/node_modules";
-    if (!fs::exists(localSymlink)) {
+    if (!fs::exists(localSymlink) && !sourceNodeDir.empty()) {
       try {
         fs::create_directory_symlink(fs::absolute(sourceNodeDir), localSymlink);
       } catch (...) {}
     }
   }
 
-  if (scope != "global") {
+  if (!sourceNodeDir.empty()) {
     setenv("NODE_PATH", fs::absolute(sourceNodeDir).c_str(), 1);
+  }
+
+  if (scope != "global") {
     char* oldPy = std::getenv("PYTHONPATH");
     std::string pythonPath = (scope == "isolated" ? moduleDir : SHARED_DEPS) + "/python_libs";
     std::string newPy = fs::absolute(pythonPath).string() + (oldPy ? ":" + std::string(oldPy) : "");
@@ -147,7 +260,7 @@ void runModules(const std::vector<std::string>& args) {
     count++;
   }
   std::cout << "------------------------------------------" << std::endl;
-  std::cout << "Execution finished. Total modules: " << count << std::endl;
+  std::cout << "[+] Execution finished. Total modules: " << count << std::endl;
 }
 
 void listModules() {
@@ -161,6 +274,6 @@ void listModules() {
       if (line.find("Description:") != std::string::npos) desc = line.substr(line.find("Description:") + 12);
     }
     std::cout << "------------------------------------------" << std::endl;
-    std::cout << "Module: " << modName << "\nName:   " << name << "\nDesc:   " << desc << std::endl;
+    std::cout << "Module: " << modName << "\nName:   " << (name.empty() ? "N/A" : name) << "\nDesc:   " << (desc.empty() ? "N/A" : desc) << std::endl;
   }
 }

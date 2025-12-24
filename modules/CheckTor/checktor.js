@@ -3,7 +3,7 @@
 // Name: Check Tor
 // Description: Check if tor is running by sending a request to https://check.torproject.org
 // Install: npm install socks-proxy-agent node-fetch
-// InstallScope: Isolated
+// InstallScope: shared
 
 import fetch from 'node-fetch';
 import { SocksProxyAgent } from 'socks-proxy-agent';
