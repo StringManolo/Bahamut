@@ -1,0 +1,40 @@
+# Bahamut Binaries
+bin/
+
+# Object files and logs
+*.o
+*.log
+
+# Node.js dependencies
+modules/shared_deps/node_modules/
+modules/**/node_modules/
+
+# Python dependencies
+modules/shared_deps/python_libs/
+modules/**/python_libs/
+
+# Auto-generated files
+modules/shared_deps/package.json
+modules/shared_deps/package-lock.json
+
+# Secrets & Environment
+.env
+*.env
+
+# Vim Swap & Temp files
+.*.swp
+.*.swo
+.swp
+.swo
+*~
+Session.vim
+.netrwhist
+
+# Build & IDEs
+Makefile.swp
+.vscode/
+.idea/
+
+# OS specific files
+.DS_Store
+Thumbs.db
