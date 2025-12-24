@@ -8,6 +8,7 @@ bin/
 # Node.js dependencies
 modules/shared_deps/node_modules/
 modules/**/node_modules/
+**/node_modules/
 
 # Python dependencies
 modules/shared_deps/python_libs/
