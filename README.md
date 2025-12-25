@@ -5,5 +5,5 @@
 <img src="repoAssets/bahamut_landscape.png" alt="bahamut_attacking_data_center" width="100%">
 
 -----
-
+ 
 <img src="repoAssets/bahamut_arch.png">
