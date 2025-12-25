@@ -88,8 +88,8 @@ std::string trimString(const std::string& str) {
     unsigned char c = str[first];
     if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
       first++;
-    } else if (first + 1 < str.size() &&
-        static_cast<unsigned char>(str[first]) == 0xC2 &&
+    } else if (first + 1 < str.size() && 
+        static_cast<unsigned char>(str[first]) == 0xC2 && 
         static_cast<unsigned char>(str[first + 1]) == 0xA0) {
       first += 2;
     }
@@ -106,8 +106,8 @@ std::string trimString(const std::string& str) {
     if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
       last--;
     }
-    else if (last >= 1 &&
-        static_cast<unsigned char>(str[last - 1]) == 0xC2 &&
+    else if (last >= 1 && 
+        static_cast<unsigned char>(str[last - 1]) == 0xC2 && 
         static_cast<unsigned char>(str[last]) == 0xA0) {
       last -= 2;
     }
@@ -170,7 +170,7 @@ ModuleMetadata parseModuleMetadata(const std::string& modulePath) {
       if (behavior == "replace" || behavior == "delete") {
         meta.storageBehavior = behavior;
       } else {
-        meta.storageBehavior = "add";
+        meta.storageBehavior = "add"; 
       }
     } else if (line.find("Args:") != std::string::npos) {
       std::string argSpec = trimString(line.substr(line.find("Args:") + 5));
@@ -491,21 +491,22 @@ void parseBMOPLine(const std::string& line, std::map<std::string, std::vector<Da
     item.value = doc["v"].GetString();
     storage[item.format].push_back(item);
 
-    std::string valuePreview = item.value.length() > 50 ? item.value.substr(0, 47) + "..." : item.value;
-    DebugLog("parseBMOPLine] Stored: format=" + item.format + ", value=" + valuePreview);
+    std::cout << "[DEBUG parseBMOPLine] Stored: format=" << item.format
+      << ", value=" << (item.value.length() > 50 ? item.value.substr(0, 47) + "..." : item.value) << std::endl;
   }
   else if (type == "batch") {
     if (doc.HasMember("f") && doc["f"].IsString()) {
       DataItem batchInfo;
       batchInfo.format = doc["f"].GetString();
-      batchInfo.value = batchInfo.format;
+      batchInfo.value = batchInfo.format; // Store format as value for lookup
       storage["__batch_format__"].push_back(batchInfo);
-      DebugLog("parseBMOPLine] Batch START: format=" + batchInfo.format);
+      std::cout << "[DEBUG parseBMOPLine] Batch START: format=" << batchInfo.format << std::endl;
     }
   }
   else if (type == "batch_end") {
-    DebugLog("parseBMOPLine] Batch END marker received");
+    std::cout << "[DEBUG parseBMOPLine] Batch END marker received" << std::endl;
   }
+  // Ignore "log", "error", "result". TODO: Proper output
 }
 
 void collectModuleOutput(const std::string& moduleName, FILE* pipe, std::map<std::string, std::vector<DataItem>>& storage) {
@@ -529,6 +530,7 @@ void collectModuleOutput(const std::string& moduleName, FILE* pipe, std::map<std
       if (line[0] == '{') {
         parseBMOPLine(line, storage);
 
+        // TODO: Weak af parsing valid json
         if (line.find("\"t\":\"batch\"") != std::string::npos) {
           inBatch = true;
           if (!storage["__batch_format__"].empty()) {
@@ -542,7 +544,7 @@ void collectModuleOutput(const std::string& moduleName, FILE* pipe, std::map<std
       } else if (inBatch && !batchFormat.empty()) {
         DataItem item;
         item.format = batchFormat;
-        item.value = line;
+        item.value = line;  
         storage[batchFormat].push_back(item);
       }
     }
@@ -554,7 +556,7 @@ void pipeDataToModule(FILE* pipe, const std::map<std::string, std::vector<DataIt
     for (const auto& [format, items] : storage) {
       if (format == "__batch_format__") continue;
       for (const auto& item : items) {
-        fprintf(pipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+        fprintf(pipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n", 
             item.format.c_str(), item.value.c_str());
         fflush(pipe);
       }
@@ -563,7 +565,7 @@ void pipeDataToModule(FILE* pipe, const std::map<std::string, std::vector<DataIt
     auto it = storage.find(consumesFormat);
     if (it != storage.end()) {
       for (const auto& item : it->second) {
-        fprintf(pipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+        fprintf(pipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n", 
             item.format.c_str(), item.value.c_str());
         fflush(pipe);
       }
@@ -583,20 +585,16 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
   ModuleMetadata meta = parseModuleMetadata(fullPath);
   std::string moduleDir = fs::path(fullPath).parent_path().string();
 
-  DebugLog("====== START " + moduleName + " ======");
-  DebugLog("Before execution - storage contents:");
-  
+  std::cout << "[DEBUG] ====== START " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] Before execution - storage contents:" << std::endl;
   int total_items_before = 0;
-  if (g_debugMode) {
-    for (const auto& [format, items] : storage) {
-      if (format == "__batch_format__") continue;
-      std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
-      total_items_before += items.size();
-    }
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_before += items.size();
   }
-  
-  DebugLog("Total items in storage: " + std::to_string(total_items_before));
-  DebugLog("Module consumes format: '" + consumesFormat + "'");
+  std::cout << "[DEBUG] Total items in storage: " << total_items_before << std::endl;
+  std::cout << "[DEBUG] Module consumes format: '" << consumesFormat << "'" << std::endl;
 
   if (fullPath.ends_with(".js")) {
     if (!meta.installCmd.empty() && meta.installScope != "global") {
@@ -627,8 +625,8 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
   if (fullPath.ends_with(".js")) {
     runner = "node";
   } else if (fullPath.ends_with(".py")) {
-    runner = getPythonVersion(fullPath) + " -u";
-    DebugLog("Using Python runner with -u flag: " + runner);
+    runner = getPythonVersion(fullPath) + " -u";  //  unbuffered TODO: Test if not needed
+    std::cout << "[DEBUG] Using Python runner with -u flag: " << runner << std::endl;
   } else if (fullPath.ends_with(".sh")) {
     runner = "bash";
   }
@@ -649,14 +647,14 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
   for (const auto& arg : args) {
     cmd += " " + arg;
   }
-  DebugLog("Full command: " + cmd);
+  std::cout << "[DEBUG] Full command: " << cmd << std::endl;
 
   if (!consumesFormat.empty()) {
-    DebugLog("====== MODULE CONSUMES DATA ======");
-    DebugLog("Setting up bidirectional pipes...");
+    std::cout << "[DEBUG] ====== MODULE CONSUMES DATA ======" << std::endl;
+    std::cout << "[DEBUG] Setting up bidirectional pipes..." << std::endl;
 
-    int stdin_pipe[2];
-    int stdout_pipe[2];
+    int stdin_pipe[2];   // [0] = read end, [1] = write end
+    int stdout_pipe[2];  // [0] = read end, [1] = write end
 
     if (pipe(stdin_pipe) != 0) {
       std::cout << "[-] Failed to create stdin pipe" << std::endl;
@@ -669,17 +667,17 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
       return;
     }
 
-    DebugLog("Pipes created successfully");
-    DebugLog("Forking process...");
+    std::cout << "[DEBUG] Pipes created successfully" << std::endl;
+    std::cout << "[DEBUG] Forking process..." << std::endl;
 
     pid_t pid = fork();
     if (pid == 0) {
-      close(stdin_pipe[1]);
-      dup2(stdin_pipe[0], STDIN_FILENO);
+      close(stdin_pipe[1]); 
+      dup2(stdin_pipe[0], STDIN_FILENO); 
       close(stdin_pipe[0]);
 
-      close(stdout_pipe[0]);
-      dup2(stdout_pipe[1], STDOUT_FILENO);
+      close(stdout_pipe[0]); 
+      dup2(stdout_pipe[1], STDOUT_FILENO); 
       close(stdout_pipe[1]);
 
       std::vector<char*> exec_args;
@@ -691,12 +689,13 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
         strcpy(arg, token.c_str());
         exec_args.push_back(arg);
       }
-      exec_args.push_back(nullptr);
+      exec_args.push_back(nullptr);  // NULL-terminated array
 
       execvp(exec_args[0], exec_args.data());
 
       std::cerr << "[DEBUG] CHILD: execvp FAILED! Error: " << strerror(errno) << std::endl;
 
+      // empty memory
       for (auto& arg : exec_args) {
         if (arg) delete[] arg;
       }
@@ -704,12 +703,12 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
       exit(EXIT_FAILURE);
     }
     else if (pid > 0) {
-      DebugLog("PARENT PROCESS: Child PID = " + std::to_string(pid));
+      std::cout << "[DEBUG] PARENT PROCESS: Child PID = " << pid << std::endl;
 
-      close(stdin_pipe[0]);
-      close(stdout_pipe[1]);
+      close(stdin_pipe[0]);  
+      close(stdout_pipe[1]); 
 
-      DebugLog("PARENT: Writing data to module's stdin...");
+      std::cout << "[DEBUG] PARENT: Writing data to module's stdin..." << std::endl;
       FILE* writePipe = fdopen(stdin_pipe[1], "w");
       if (!writePipe) {
         std::cout << "[-] Failed to open write pipe" << std::endl;
@@ -722,42 +721,28 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
       int formats_sent = 0;
 
       if (consumesFormat == "*") {
-        DebugLog("PARENT: Sending ALL formats from storage");
-        
-        if (g_debugMode) {
-          for (const auto& [format, items] : storage) {
-            if (format == "__batch_format__") continue;
-            std::cout << "[DEBUG] PARENT:   Format '" << format << "' has "
-              << items.size() << " items" << std::endl;
+        std::cout << "[DEBUG] PARENT: Sending ALL formats from storage" << std::endl;
+        for (const auto& [format, items] : storage) {
+          if (format == "__batch_format__") continue;
 
-            if (items.empty()) continue;
+          std::cout << "[DEBUG] PARENT:   Format '" << format << "' has "
+            << items.size() << " items" << std::endl;
 
-            formats_sent++;
-            for (const auto& item : items) {
-              fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
-                  item.format.c_str(), item.value.c_str());
-              items_sent++;
+          if (items.empty()) continue;
 
-              if (items_sent % 1000 == 0) {
-                std::cout << "[DEBUG] PARENT: Sent " << items_sent << " items so far..." << std::endl;
-              }
-            }
-          }
-        } else {
-          for (const auto& [format, items] : storage) {
-            if (format == "__batch_format__") continue;
-            if (items.empty()) continue;
+          formats_sent++;
+          for (const auto& item : items) {
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                item.format.c_str(), item.value.c_str());
+            items_sent++;
 
-            formats_sent++;
-            for (const auto& item : items) {
-              fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
-                  item.format.c_str(), item.value.c_str());
-              items_sent++;
+            if (items_sent % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Sent " << items_sent << " items so far..." << std::endl;
             }
           }
         }
       } else {
-        DebugLog("PARENT: Sending specific format: '" + consumesFormat + "'");
+        std::cout << "[DEBUG] PARENT: Sending specific format: '" << consumesFormat << "'" << std::endl;
         auto it = storage.find(consumesFormat);
         if (it != storage.end() && !it->second.empty()) {
           formats_sent = 1;
@@ -767,18 +752,18 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
             items_sent++;
           }
         } else {
-          DebugLog("PARENT: No data found for format '" + consumesFormat + "'");
+          std::cout << "[DEBUG] PARENT: No data found for format '" << consumesFormat << "'" << std::endl;
         }
       }
 
-      DebugLog("PARENT: Finished writing. Total: " + std::to_string(items_sent) + 
-               " items from " + std::to_string(formats_sent) + " formats");
+      std::cout << "[DEBUG] PARENT: Finished writing. Total: "
+        << items_sent << " items from " << formats_sent << " formats" << std::endl;
 
       fflush(writePipe);
       fclose(writePipe);
-      DebugLog("PARENT: Write pipe closed (EOF sent to module)");
+      std::cout << "[DEBUG] PARENT: Write pipe closed (EOF sent to module)" << std::endl;
 
-      DebugLog("PARENT: Reading module output from stdout...");
+      std::cout << "[DEBUG] PARENT: Reading module output from stdout..." << std::endl;
 
       if (!consumesFormat.empty() && consumesFormat != "*") {
         std::string currentModulePath = findModulePath(moduleName);
@@ -786,15 +771,16 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
           ModuleMetadata currentMeta = parseModuleMetadata(currentModulePath);
           if (currentMeta.provides == consumesFormat) {
             if (currentMeta.storageBehavior == "replace") {
-              DebugLog("STORAGE BEHAVIOR: REPLACE for '" + consumesFormat + "'");
-              DebugLog("  Clearing " + std::to_string(storage[consumesFormat].size()) + " existing items.");
-              storage[consumesFormat].clear();
+              std::cout << "[DEBUG] STORAGE BEHAVIOR: REPLACE for '" << consumesFormat << "'" << std::endl;
+              std::cout << "[DEBUG]   Clearing " << storage[consumesFormat].size() << " existing items." << std::endl;
+              storage[consumesFormat].clear(); 
 
             } else if (currentMeta.storageBehavior == "delete") {
-              DebugLog("STORAGE BEHAVIOR: DELETE for '" + consumesFormat + "'");
-              DebugLog("  Removing key and " + std::to_string(storage[consumesFormat].size()) + " items.");
-              storage.erase(consumesFormat);
+              std::cout << "[DEBUG] STORAGE BEHAVIOR: DELETE for '" << consumesFormat << "'" << std::endl;
+              std::cout << "[DEBUG]   Removing key and " << storage[consumesFormat].size() << " items." << std::endl;
+              storage.erase(consumesFormat); 
             }
+            // "add" here (already default)
           }
         }
       }
@@ -806,6 +792,7 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
         return;
       }
 
+      // batch config
       char buffer[4096];
       std::string lineBuffer;
       std::string batchFormat;
@@ -836,12 +823,12 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
               inBatch = true;
               batchFormat = storage["__batch_format__"][0].format;
               storage["__batch_format__"].clear();
-              DebugLog("PARENT: Batch START detected. Format: " + batchFormat);
+              std::cout << "[DEBUG] PARENT: Batch START detected. Format: " << batchFormat << std::endl;
             }
             else if (line.find("batch_end") != std::string::npos) {
               inBatch = false;
-              DebugLog("PARENT: Batch END detected. Total collected: " + 
-                       std::to_string(storage[batchFormat].size()) + " items");
+              std::cout << "[DEBUG] PARENT: Batch END detected. Total collected: "
+                << storage[batchFormat].size() << " items" << std::endl;
               batchFormat.clear();
             }
           }
@@ -852,7 +839,7 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
             storage[batchFormat].push_back(item);
             items_collected++;
 
-            if (g_debugMode && items_collected % 1000 == 0) {
+            if (items_collected % 1000 == 0) {
               std::cout << "[DEBUG] PARENT: Collected " << items_collected
                 << " items from batch" << std::endl;
             }
@@ -860,24 +847,24 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
         }
       }
 
-      DebugLog("PARENT: Finished reading module output");
-      DebugLog("PARENT: Lines read: " + std::to_string(lines_read));
-      DebugLog("PARENT: Items collected: " + std::to_string(items_collected));
+      std::cout << "[DEBUG] PARENT: Finished reading module output" << std::endl;
+      std::cout << "[DEBUG] PARENT: Lines read: " << lines_read << std::endl;
+      std::cout << "[DEBUG] PARENT: Items collected: " << items_collected << std::endl;
 
       fclose(readPipe);
 
-      DebugLog("PARENT: Waiting for module to finish...");
+      std::cout << "[DEBUG] PARENT: Waiting for module to finish..." << std::endl;
       int status;
       waitpid(pid, &status, 0);
 
       if (WIFEXITED(status)) {
-        DebugLog("PARENT: Module exited with status: " + std::to_string(WEXITSTATUS(status)));
+        std::cout << "[DEBUG] PARENT: Module exited with status: " << WEXITSTATUS(status) << std::endl;
       } else if (WIFSIGNALED(status)) {
-        DebugLog("PARENT: Module terminated by signal: " + std::to_string(WTERMSIG(status)));
+        std::cout << "[DEBUG] PARENT: Module terminated by signal: " << WTERMSIG(status) << std::endl;
       }
 
-      DebugLog("PARENT: Data sent to module: " + std::to_string(items_sent) + " items");
-      DebugLog("PARENT: Data received from module: " + std::to_string(items_collected) + " items");
+      std::cout << "[DEBUG] PARENT: Data sent to module: " << items_sent << " items" << std::endl;
+      std::cout << "[DEBUG] PARENT: Data received from module: " << items_collected << " items" << std::endl;
 
     } else {
       std::cout << "[-] Fork failed" << std::endl;
@@ -889,7 +876,7 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
     }
   }
   else {
-    DebugLog("====== MODULE GENERATES DATA ONLY ======");
+    std::cout << "[DEBUG] ====== MODULE GENERATES DATA ONLY ======" << std::endl;
 
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
@@ -927,12 +914,12 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
             inBatch = true;
             batchFormat = storage["__batch_format__"][0].format;
             storage["__batch_format__"].clear();
-            DebugLog("Batch START detected. Format: " + batchFormat);
+            std::cout << "[DEBUG] Batch START detected. Format: " << batchFormat << std::endl;
           }
           else if (line.find("batch_end") != std::string::npos) {
             inBatch = false;
-            DebugLog("Batch END detected. Total " + batchFormat + 
-                     " items: " + std::to_string(storage[batchFormat].size()));
+            std::cout << "[DEBUG] Batch END detected. Total " << batchFormat
+              << " items: " << storage[batchFormat].size() << std::endl;
             batchFormat.clear();
           }
         }
@@ -943,53 +930,49 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
           storage[batchFormat].push_back(item);
           items_collected++;
 
-          if (g_debugMode && items_collected % 1000 == 0) {
+          if (items_collected % 1000 == 0) {
             std::cout << "[DEBUG] Collected " << items_collected
               << " " << batchFormat << " items so far..." << std::endl;
           }
         }
         else if (!line.empty()) {
-          DebugLog("Line ignored - Not JSON and not in batch: '" + line + "'");
+          std::cout << "[DEBUG] Line ignored - Not JSON and not in batch: '" << line << "'" << std::endl;
         }
       }
     }
 
     int pclose_status = pclose(pipe);
     if (pclose_status != 0) {
-      DebugLog("Module exited with non-zero status: " + std::to_string(pclose_status));
+      std::cout << "[DEBUG] Module exited with non-zero status: " << pclose_status << std::endl;
     }
 
-    DebugLog("Total lines read: " + std::to_string(lines_read));
-    DebugLog("Total items collected: " + std::to_string(items_collected));
+    std::cout << "[DEBUG] Total lines read: " << lines_read << std::endl;
+    std::cout << "[DEBUG] Total items collected: " << items_collected << std::endl;
   }
 
-  DebugLog("====== END " + moduleName + " ======");
-  DebugLog("After execution - storage contents:");
-  
+  std::cout << "[DEBUG] ====== END " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] After execution - storage contents:" << std::endl;
   int total_items_after = 0;
-  if (g_debugMode) {
-    for (const auto& [format, items] : storage) {
-      if (format == "__batch_format__") continue;
-      std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
-      total_items_after += items.size();
-    }
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_after += items.size();
   }
-  
-  DebugLog("Total items in storage: " + std::to_string(total_items_after));
-  DebugLog("Net change: +" + std::to_string(total_items_after - total_items_before) + " items");
+  std::cout << "[DEBUG] Total items in storage: " << total_items_after << std::endl;
+  std::cout << "[DEBUG] Net change: +" << (total_items_after - total_items_before) << " items" << std::endl;
 
-  if (g_debugMode) {
-    for (const auto& [format, items] : storage) {
-      if (format == "__batch_format__") continue;
-      if (!items.empty()) {
-        std::cout << "[DEBUG] Sample of " << format << " items (first 3):" << std::endl;
-        for (size_t i = 0; i < std::min(items.size(), size_t(3)); i++) {
-          std::cout << "[DEBUG]   [" << i << "] " << items[i].value << std::endl;
-        }
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    if (!items.empty()) {
+      std::cout << "[DEBUG] Sample of " << format << " items (first 3):" << std::endl;
+      for (size_t i = 0; i < std::min(items.size(), size_t(3)); i++) {
+        std::cout << "[DEBUG]   [" << i << "] " << items[i].value << std::endl;
       }
     }
   }
 }
+
+
 
 void runModule(const std::string& moduleName, const std::vector<std::string>& args) {
   std::map<std::string, std::vector<DataItem>> dummyStorage;
@@ -1027,6 +1010,7 @@ std::vector<std::string> loadProfile(const std::string& profileName) {
   file.close();
   return modules;
 }
+
 
 void runModulesFromProfile(const std::string& profileName, const std::vector<std::string>& args) {
   std::vector<std::string> modules = loadProfile(profileName);

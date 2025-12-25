@@ -35,6 +35,8 @@ int main(int argc, char* argv[]) {
   bool verbose = cli.s["v"] || cli.c["verbose"];
   bool debug = cli.s["d"] || cli.c["debug"];
 
+  setDebugMode(debug);
+
   if (cli.c["version"]) {
     PrintLogo("repoAssets/bahamut_landscape.png");
     std::cout << std::endl;
