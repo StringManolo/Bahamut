@@ -23,6 +23,9 @@ struct ModuleMetadata {
   std::vector<std::string> argSpecs;
 };
 
+void setDebugMode(bool enabled);
+bool isDebugEnabled();
+
 void installModule(std::string moduleName);
 void uninstallModule(std::string moduleName);
 void purgeSharedDeps();
