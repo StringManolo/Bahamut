@@ -20,11 +20,13 @@ struct ModuleMetadata {
   std::string storageBehavior;
   std::string installCmd;
   std::string installScope;
+  std::vector<std::string> argSpecs;
 };
 
 void installModule(std::string moduleName);
 void uninstallModule(std::string moduleName);
 void purgeSharedDeps();
+void describeModule(const std::string& moduleName); 
 void runModule(const std::string& moduleName, const std::vector<std::string>& args);
 void runModules(const std::vector<std::string>& args);
 void runModulesFromProfile(const std::string& profileName, const std::vector<std::string>& args);

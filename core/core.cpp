@@ -156,6 +156,9 @@ ModuleMetadata parseModuleMetadata(const std::string& modulePath) {
       } else {
         meta.storageBehavior = "add"; 
       }
+    } else if (line.find("Args:") != std::string::npos) {
+      std::string argSpec = trimString(line.substr(line.find("Args:") + 5));
+      meta.argSpecs.push_back(argSpec);
     }
   }
   file.close();
@@ -1096,5 +1099,63 @@ void listModules() {
     if (!meta.provides.empty()) {
       std::cout << "Provides: " << meta.provides << std::endl;
     }
+  }
+}
+
+void describeModule(const std::string& moduleName) {
+  std::string fullPath = findModulePath(moduleName);
+  if (fullPath.empty()) {
+    std::cout << "[-] Module not found: " << moduleName << std::endl;
+    return;
+  }
+
+  ModuleMetadata meta = parseModuleMetadata(fullPath);
+
+  std::cout << "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" << std::endl;
+  std::cout << "MODULE: " << moduleName << std::endl;
+  std::cout << "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" << std::endl;
+
+  std::cout << "Name:        " << (meta.name.empty() ? "N/A" : meta.name) << std::endl;
+  std::cout << "Description: " << (meta.description.empty() ? "N/A" : meta.description) << std::endl;
+
+  if (!meta.type.empty()) {
+    std::cout << "Type:        " << meta.type << std::endl;
+  }
+  if (meta.stage != 999) {
+    std::cout << "Stage:       " << meta.stage << std::endl;
+  }
+  if (!meta.consumes.empty()) {
+    std::cout << "Consumes:    " << meta.consumes << std::endl;
+  }
+  if (!meta.provides.empty()) {
+    std::cout << "Provides:    " << meta.provides << std::endl;
+  }
+  if (!meta.installCmd.empty()) {
+    std::cout << "Install:     " << meta.installCmd << std::endl;
+  }
+  if (!meta.installScope.empty()) {
+    std::cout << "InstallScope: " << meta.installScope << std::endl;
+  }
+
+  if (!meta.argSpecs.empty()) {
+    std::cout << "\nARGUMENTS:" << std::endl;
+    for (const auto& spec : meta.argSpecs) {
+      std::cout << "  " << spec << std::endl;
+    }
+  } else {
+    std::cout << "\n(No arguments defined)" << std::endl;
+  }
+
+  std::cout << "\nUSAGE:" << std::endl;
+  std::cout << "  ./bahamut run " << moduleName;
+  if (!meta.argSpecs.empty()) {
+    std::cout << " -- [arguments]";
+  }
+  std::cout << "\n" << std::endl;
+
+  if (!meta.argSpecs.empty()) {
+    std::cout << "EXAMPLES:" << std::endl;
+    std::cout << "  ./bahamut run " << moduleName << " -- --help" << std::endl;
+    std::cout << std::endl;
   }
 }

@@ -135,6 +135,28 @@ Declares what data format this module produces:
 // Provides: url           // Produces URLs
 ```
 
+## Module Arguments
+
+Modules can accept command-line arguments using the `--` separator:
+```bash
+./bahamut run module.py -- --arg1 value --arg2
+```
+
+Arguments before `--` are for Bahamut, after `--` are for the module.
+
+### Documenting Arguments
+
+Add `Args:` directives in your module:
+```python
+# Args: -u, --url <url> (required) Target URL
+# Args: -v, --verbose (flag, optional) Verbose output
+```
+
+### Viewing Module Arguments
+```bash
+./bahamut describe module.py
+```
+
 ## Storage Behavior Control
 
 ### Overview
