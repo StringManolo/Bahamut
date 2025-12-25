@@ -1,0 +1,16 @@
+# Bahamut Reconnaissance Profile
+# Author: Bahamut Team
+# Purpose: Full domain reconnaissance workflow
+
+# Prerequisites check
+checktor.js
+
+# Data collection
+getbugbountydomains.py
+
+# Data processing
+cleanwildcards.js
+# createsubdomains.py
+
+# Export results
+exportcsv.sh
