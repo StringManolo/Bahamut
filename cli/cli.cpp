@@ -39,24 +39,36 @@ int main(int argc, char* argv[]) {
 
     if (command == "list") {
       listModules();
-    } 
+    }
     else if (command == "run") {
-      if (cli.o.size() < 2) {
-        Error("Usage: run <module_name | all> [args...]");
+      if (cli.c["profile"]) {
+        std::string profileName = cli.c["profile"].toString();
+        std::vector<std::string> extraArgs;
+
+        for (size_t i = 1; i < cli.o.size(); ++i) {
+          extraArgs.push_back(cli.o[i].first);
+        }
+
+        if (verbose) Verbose("Executing profile: " + profileName);
+        runModulesFromProfile(profileName, extraArgs);
       }
-
-      std::string target = cli.o[1].first;
-      std::vector<std::string> extraArgs;
-
-      for (size_t i = 2; i < cli.o.size(); ++i) {
-        extraArgs.push_back(cli.o[i].first);
+      else if (cli.o.size() < 2) {
+        Error("Usage: run <module_name | all> [args...] or run --profile <name>");
       }
+      else {
+        std::string target = cli.o[1].first;
+        std::vector<std::string> extraArgs;
 
-      if (target == "all") {
-        Verbose("Executing all modules in sequence...");
-        runModules(extraArgs);
-      } else {
-        runModule(target, extraArgs);
+        for (size_t i = 2; i < cli.o.size(); ++i) {
+          extraArgs.push_back(cli.o[i].first);
+        }
+
+        if (target == "all") {
+          if (verbose) Verbose("Executing all modules by stage...");
+          runModulesByStage(extraArgs);
+        } else {
+          runModule(target, extraArgs);
+        }
       }
     }
     else if (command == "install") {
@@ -89,7 +101,7 @@ void ShowHelp() {
   auto cyan = cli.color["cyan"];
   auto dim = cli.color["dim"];
 
-  std::cout << "\n" << "" << bold["red"]("BAHAMUT") << " - Modular Hacking Orchestrator\n" << std::endl;
+  std::cout << "\n" << bold["red"]("BAHAMUT") << " - Modular Hacking Orchestrator\n" << std::endl;
 
   PrintLogo("repoAssets/bahamut_landscape.png -s 80x27");
   std::cout << std::endl;
@@ -97,22 +109,24 @@ void ShowHelp() {
   std::cout << "  ./bahamut [command] [arguments]\n" << std::endl;
 
   std::cout << bold["white"]("COMMANDS:") << std::endl;
-  std::cout << std::left << std::setw(25) << "  run <module | all>" << "Run a specific module or all of them" << std::endl;
-  std::cout << std::left << std::setw(25) << "  list" << "List all available modules" << std::endl;
-  std::cout << std::left << std::setw(25) << "  install <module>" << "Install dependencies for a module" << std::endl;
-  std::cout << std::left << std::setw(25) << "  uninstall <module>" << "Remove module-specific dependencies" << std::endl;
-  std::cout << std::left << std::setw(25) << "  purge" << "Clear all shared dependencies and symlinks" << std::endl;
-  
+  std::cout << std::left << std::setw(30) << "  run <module>" << "Run a specific module" << std::endl;
+  std::cout << std::left << std::setw(30) << "  run all" << "Run all modules by stage" << std::endl;
+  std::cout << std::left << std::setw(30) << "  run --profile <name>" << "Run modules from profile" << std::endl;
+  std::cout << std::left << std::setw(30) << "  list" << "List all available modules" << std::endl;
+  std::cout << std::left << std::setw(30) << "  install <module>" << "Install dependencies for a module" << std::endl;
+  std::cout << std::left << std::setw(30) << "  uninstall <module>" << "Remove module-specific dependencies" << std::endl;
+  std::cout << std::left << std::setw(30) << "  purge" << "Clear all shared dependencies and symlinks" << std::endl;
+
   std::cout << "\n" << bold["white"]("OPTIONS:") << std::endl;
-  std::cout << std::left << std::setw(25) << "  -h, --help" << "Show this help" << std::endl;
-  std::cout << std::left << std::setw(25) << "  -v, --verbose" << "Show more information" << std::endl;
-  std::cout << std::left << std::setw(25) << "  -d, --debug" << "Show debug logs" << std::endl;
-  std::cout << std::left << std::setw(25) << "  --version" << "Show version" << std::endl;
+  std::cout << std::left << std::setw(30) << "  -h, --help" << "Show this help" << std::endl;
+  std::cout << std::left << std::setw(30) << "  -v, --verbose" << "Show more information" << std::endl;
+  std::cout << std::left << std::setw(30) << "  -d, --debug" << "Show debug logs" << std::endl;
+  std::cout << std::left << std::setw(30) << "  --version" << "Show version" << std::endl;
 
   std::cout << "\n" << dim["yellow"]("Examples:") << std::endl;
-  std::cout << "  ./bahamut run checktor.js" << std::endl;
-  std::cout << "  ./bahamut run scanner.py --verbose" << std::endl;
-  std::cout << "  ./bahamut run all" << std::endl;
+  std::cout << "  " << cyan("./bahamut run checktor.js") << std::endl;
+  std::cout << "  " << cyan("./bahamut run all") << std::endl;
+  std::cout << "  " << cyan("./bahamut run --profile recon") << std::endl;
   std::cout << std::endl;
 }
 

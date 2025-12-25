@@ -23,6 +23,7 @@ modules/**/python_libs/
 # Auto-generated files
 modules/shared_deps/package.json
 modules/shared_deps/package-lock.json
+output/
 
 # Secrets & Environment
 .env

@@ -135,6 +135,143 @@ Declares what data format this module produces:
 // Provides: url           // Produces URLs
 ```
 
+## Storage Behavior Control
+
+### Overview
+The `// Storage:` directive controls how modules interact with the in-memory storage system when they **both consume and provide the same data format**. This prevents data duplication and enables clean data transformation pipelines.
+
+### Directive Syntax
+```javascript
+// Storage: replace    // or "add", "delete"
+```
+
+### Available Behaviors
+
+#### `add` (Default)
+- **Description**: New data is appended to existing storage
+- **Use case**: Accumulating data from multiple sources
+- **Example**: Combining domains from different collectors
+```javascript
+// Storage: add
+// Consumes: domain
+// Provides: domain
+```
+**Result**: `storage["domain"]` contains both old and new domains
+
+#### `replace`
+- **Description**: Existing storage is cleared before adding new data
+- **Use case**: Data cleaning/transformation modules
+- **Example**: Cleaning wildcards from domains
+```javascript
+// Storage: replace
+// Consumes: domain
+// Provides: domain
+```
+**Result**: `storage["domain"]` contains only the cleaned domains (replaces old ones)
+
+#### `delete`
+- **Description**: The format is completely removed from storage
+- **Use case**: Filtering out unwanted data
+- **Example**: Removing invalid or blacklisted domains
+```javascript
+// Storage: delete
+// Consumes: domain
+// Provides: domain
+```
+**Result**: `storage["domain"]` is emptied (key remains but contains 0 items)
+
+### Practical Examples
+
+#### Example 1: Domain Cleaning Pipeline
+```javascript
+// Module: cleanwildcards.js
+// Name: Wildcard Domain Cleaner
+// Type: processor
+// Stage: 2
+// Consumes: domain
+// Provides: domain
+// Storage: replace    // Critical: prevents duplication
+
+// Without "replace": storage["domain"] would contain:
+// [original_domains, cleaned_domains] → DUPLICATION
+
+// With "replace": storage["domain"] contains:
+// [cleaned_domains] → CLEAN TRANSFORMATION
+```
+
+#### Example 2: Data Filtering Module
+```javascript
+// Module: filterblacklist.js
+// Name: Blacklist Filter
+// Type: processor
+// Stage: 2
+// Consumes: domain
+// Provides: domain
+// Storage: delete    // Removes blacklisted domains
+
+// After processing, storage["domain"] contains:
+// [] (empty) if all domains were blacklisted
+```
+
+### Implementation Notes
+
+When a module executes with `Consumes: X` and `Provides: X`:
+
+1. **`replace` mode**: `storage["X"]` is cleared before new items are added
+2. **`add` mode**: New items are appended to existing `storage["X"]` (default)
+3. **`delete` mode**: `storage["X"]` is completely removed from storage
+
+This behavior is implemented in `core.cpp`'s `runModuleWithPipe()` function and activates automatically when the metadata conditions are met.
+
+### Best Practices
+
+1. **Always specify `// Storage:`** when a module has both `Consumes: X` and `Provides: X`
+2. **Use `replace` for data transformers** (cleaners, normalizers, deduplicators)
+3. **Use `add` for data aggregators** (collecting from multiple sources)
+4. **Use `delete` for data filters** (removing invalid or unwanted data)
+5. **Test with small datasets** to verify the storage behavior matches expectations
+
+### Debugging Storage Behavior
+
+When running modules with storage directives, look for debug messages:
+```
+[DEBUG] STORAGE BEHAVIOR: REPLACE for 'domain'
+[DEBUG]   Clearing 35632 existing items.
+```
+
+These logs confirm the storage behavior is active and show how many items were affected.
+
+### Common Issues & Solutions
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| Duplicate data in output | Missing `// Storage: replace` | Add `// Storage: replace` to transformer modules |
+| Data disappears after processing | Using `delete` instead of `replace` | Change to `// Storage: replace` |
+| Memory usage grows unnecessarily | Using `add` for transformation modules | Use `replace` for data transformers |
+
+### Integration Example
+
+Here's how storage behavior integrates into a complete module:
+
+```javascript
+#!/usr/bin/env node
+// Name: Wildcard Domain Cleaner
+// Description: Removes wildcard prefixes and deduplicates domains
+// Type: processor
+// Stage: 2
+// Consumes: domain
+// Provides: domain
+// Storage: replace    // ← CRITICAL: Prevents duplication
+// Install:
+// InstallScope: global
+
+console.log(JSON.stringify({bmop:"1.0",module:"wildcard-cleaner",pid:process.pid}));
+
+// Module implementation...
+```
+
+This configuration ensures that when `cleanwildcards.js` processes domains, it replaces the original list with the cleaned version rather than creating duplicates.
+
 ---
 
 ## Module Execution System
