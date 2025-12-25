@@ -1,0 +1,9 @@
+# Bahamut Test arguments 
+# Author: Bahamut Team
+# Purpose: Test arguments directly into workflow
+
+# Get the robots.txt file
+getrobotsfromurl.py -u github.com
+
+# Export results
+exportcsv.sh
