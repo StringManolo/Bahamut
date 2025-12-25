@@ -7,7 +7,7 @@
 #include <set>
 #include <chrono>
 #include <thread>
-#include "core/core.hpp"
+#include "../core/core.hpp"
 
 namespace fs = std::filesystem;
 
@@ -198,30 +198,37 @@ console.log('{"t":"result","ok":true,"count":0}');)";
 }
 
 TEST_F(InstallationTest, InstallWithSpecificPythonVersion) {
-  std::vector<std::string> pythonVersions = {"python3.8", "python3.9", "python3.10", "python3.11"};
+  fs::remove_all("modules/shared_deps");
+  
+  std::vector<std::string> pythonVersions = {"python3", "python3.8", "python3.9", "python3.10", "python3.11"};
   
   for (const auto& pythonCmd : pythonVersions) {
-    std::string content = "# Install: pip install certifi\n" +
-                         "# InstallScope: shared\n" +
-                         "import json\n" +
-                         "print(json.dumps({\"bmop\":\"1.0\",\"module\":\"test\"}))\n" +
-                         "print(json.dumps({\"t\":\"result\",\"ok\":True,\"count\":0}))";
-    
-    createTestModule("modules/python_version_test.py", content);
+    std::string content = "# Install: pip install certifi\n"
+                          "# InstallScope: shared\n"
+                          "import json\n"
+                          "print(json.dumps({\"bmop\":\"1.0\",\"module\":\"test\"}))\n"
+                          "print(json.dumps({\"t\":\"result\",\"ok\":True,\"count\":0}))";
     
     std::string shebang = "#!/usr/bin/env " + pythonCmd + "\n";
-    std::ofstream file("modules/python_version_test.py");
-    file << shebang << content;
+    std::string fullContent = shebang + content;
+    
+    fs::path filepath("modules/python_version_test.py");
+    fs::create_directories(filepath.parent_path());
+    std::ofstream file(filepath);
+    file << fullContent;
     file.close();
+    fs::permissions(filepath, fs::perms::owner_exec, fs::perm_options::add);
     
     installModule("python_version_test.py");
     
     bool found_certifi = false;
-    for (const auto& entry : fs::directory_iterator("modules/shared_deps/python_libs")) {
-      std::string name = entry.path().filename().string();
-      if (name.find("certifi") != std::string::npos) {
-        found_certifi = true;
-        break;
+    if (fs::exists("modules/shared_deps/python_libs")) {
+      for (const auto& entry : fs::directory_iterator("modules/shared_deps/python_libs")) {
+        std::string name = entry.path().filename().string();
+        if (name.find("certifi") != std::string::npos) {
+          found_certifi = true;
+          break;
+        }
       }
     }
     EXPECT_TRUE(found_certifi);
@@ -368,8 +375,3 @@ print('test'))";
   installModule("fallback_test.py");
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  testing::GTEST_FLAG(color) = "yes";
-  return RUN_ALL_TESTS();
-}
