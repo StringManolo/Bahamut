@@ -19,4 +19,13 @@
 - Ignore "log", "error", "result". TODO: Proper output
 - Check if modules scope are respected
 - Add insane amount of tests
-- Clean tests
+- Clean tests:
+```
+[  FAILED  ] BahamutTest.FindModulePathRecursive
+[  FAILED  ] BahamutTest.SetupPythonEnvironmentShared
+[  FAILED  ] BahamutTest.ComplexPipelineIntegration
+[  FAILED  ] BahamutTest.EnsureDirectoriesExist
+[  FAILED  ] BahamutTest.ModulePathResolution
+[  FAILED  ] BahamutTest.ProfileModuleNotFound
+[  FAILED  ] BahamutTest.CompleteSystemTest
+```
