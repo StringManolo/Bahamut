@@ -3,11 +3,8 @@
 ## Install & Run
 ```bash
 git clone https://github.com/stringmanolo/bahamut
-
 cd bahamut
-
 make
-
 ./bahamut
 ```
 
