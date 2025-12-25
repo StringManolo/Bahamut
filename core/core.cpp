@@ -65,10 +65,50 @@ std::vector<std::string> getModules() {
 }
 
 std::string trimString(const std::string& str) {
-  size_t first = str.find_first_not_of(" \t\r\n");
-  if (first == std::string::npos) return "";
-  size_t last = str.find_last_not_of(" \t\r\n");
-  return str.substr(first, last - first + 1);
+    if (str.empty()) return "";
+    
+    // Encontrar el primer carácter que no sea espacio (incluyendo algunos espacios Unicode comunes)
+    size_t first = 0;
+    while (first < str.size()) {
+        unsigned char c = str[first];
+        // Espacios ASCII: espacio, tab, CR, LF
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+            first++;
+        }
+        // Espacio de no separación Unicode (0xC2A0 en UTF-8)
+        else if (first + 1 < str.size() && 
+                 static_cast<unsigned char>(str[first]) == 0xC2 && 
+                 static_cast<unsigned char>(str[first + 1]) == 0xA0) {
+            first += 2;
+        }
+        else {
+            break;
+        }
+    }
+    
+    // Si toda la cadena son espacios
+    if (first >= str.size()) return "";
+    
+    // Encontrar el último carácter que no sea espacio
+    size_t last = str.size() - 1;
+    while (last > first) {
+        unsigned char c = str[last];
+        // Espacios ASCII
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+            last--;
+        }
+        // Espacio de no separación Unicode (debe verificar desde el penúltimo)
+        else if (last >= 1 && 
+                 static_cast<unsigned char>(str[last - 1]) == 0xC2 && 
+                 static_cast<unsigned char>(str[last]) == 0xA0) {
+            last -= 2;
+        }
+        else {
+            break;
+        }
+    }
+    
+    return str.substr(first, last - first + 1);
 }
 
 ModuleMetadata parseModuleMetadata(const std::string& modulePath) {
@@ -397,91 +437,49 @@ std::string setupPythonEnvironment(const std::string& fullPath, const std::strin
   return pythonLibsPath;
 }
 
-/*
 void parseBMOPLine(const std::string& line, std::map<std::string, std::vector<DataItem>>& storage) {
-  if (line.empty() || line[0] != '{') return;
+    if (line.empty() || line[0] != '{') return;
 
-  size_t tPos = line.find("\"t\":");
-  if (tPos == std::string::npos) return;
+    rapidjson::Document doc;
+    rapidjson::ParseResult ok = doc.Parse(line.c_str());
 
-  size_t tStart = line.find("\"", tPos + 4);
-  size_t tEnd = line.find("\"", tStart + 1);
-  if (tStart == std::string::npos || tEnd == std::string::npos) return;
-
-  std::string type = line.substr(tStart + 1, tEnd - tStart - 1);
-
-  if (type == "d") {
-    size_t fPos = line.find("\"f\":");
-    size_t vPos = line.find("\"v\":");
-
-    if (fPos == std::string::npos || vPos == std::string::npos) return;
-
-    size_t fStart = line.find("\"", fPos + 4);
-    size_t fEnd = line.find("\"", fStart + 1);
-    size_t vStart = line.find("\"", vPos + 4);
-    size_t vEnd = line.find("\"", vStart + 1);
-
-    if (fStart == std::string::npos || fEnd == std::string::npos ||
-        vStart == std::string::npos || vEnd == std::string::npos) return;
-
-    std::string format = line.substr(fStart + 1, fEnd - fStart - 1);
-    std::string value = line.substr(vStart + 1, vEnd - vStart - 1);
-
-    DataItem item;
-    item.format = format;
-    item.value = value;
-    storage[format].push_back(item);
-  }
-  else if (type == "batch") {
-    size_t fPos = line.find("\"f\":");
-    if (fPos != std::string::npos) {
-      size_t fStart = line.find("\"", fPos + 4);
-      size_t fEnd = line.find("\"", fStart + 1);
-      if (fStart != std::string::npos && fEnd != std::string::npos) {
-        std::string format = line.substr(fStart + 1, fEnd - fStart - 1);
-        storage["__batch_format__"] = {{format, format}};
-      }
-    }
-  }
-}
-*/
-
-void parseBMOPLine(const std::string& line, std::map<std::string, std::vector<DataItem>>& storage) {
-  if (line.empty() || line[0] != '{') return;
-
-  rapidjson::Document doc;
-  rapidjson::ParseResult ok = doc.Parse(line.c_str());
-
-  if (!ok) {
-    std::cerr << "[Warn] BMOP parse error. Offset: " << ok.Offset()
-      << ", Reason: " << rapidjson::GetParseError_En(ok.Code()) << std::endl;
-    return;
-  }
-
-  if (!doc.HasMember("t") || !doc["t"].IsString()) return;
-
-  std::string type = doc["t"].GetString();
-
-  if (type == "d") {
-    if (!doc.HasMember("f") || !doc.HasMember("v") ||
-        !doc["f"].IsString() || !doc["v"].IsString()) {
-      return;
+    if (!ok) {
+        // Intenta parsear como JSON relajado (permite espacios extra)
+        rapidjson::Document doc2;
+        rapidjson::ParseResult ok2 = doc2.Parse<rapidjson::kParseDefaultFlags | rapidjson::kParseCommentsFlag | rapidjson::kParseTrailingCommasFlag>(line.c_str());
+        
+        if (!ok2) {
+            std::cerr << "[Warn] BMOP parse error. Offset: " << ok.Offset()
+                      << ", Reason: " << rapidjson::GetParseError_En(ok.Code()) << std::endl;
+            return;
+        }
+        doc.Swap(doc2);
     }
 
-    DataItem item;
-    item.format = doc["f"].GetString();
-    item.value = doc["v"].GetString();
-    storage[item.format].push_back(item);
-  }
-  else if (type == "batch") {
-    if (doc.HasMember("f") && doc["f"].IsString()) {
-      DataItem batchInfo;
-      batchInfo.format = doc["f"].GetString();
-      batchInfo.value = "";
-      storage["__batch_format__"].push_back(batchInfo);
+    if (!doc.HasMember("t") || !doc["t"].IsString()) return;
+
+    std::string type = doc["t"].GetString();
+
+    if (type == "d") {
+        if (!doc.HasMember("f") || !doc.HasMember("v") ||
+            !doc["f"].IsString() || !doc["v"].IsString()) {
+            return;
+        }
+
+        DataItem item;
+        item.format = doc["f"].GetString();
+        item.value = doc["v"].GetString();
+        storage[item.format].push_back(item);
     }
-  }
-  // Ignorar "batch_end" y otros tipos no manejados
+    else if (type == "batch") {
+        if (doc.HasMember("f") && doc["f"].IsString()) {
+            DataItem batchInfo;
+            batchInfo.format = doc["f"].GetString();
+            batchInfo.value = batchInfo.format;
+            storage["__batch_format__"].push_back(batchInfo);
+        }
+    }
+    // Ignorar otros tipos como "batch_end", "log", "error", "result"
 }
 
 void collectModuleOutput(const std::string& moduleName, FILE* pipe, std::map<std::string, std::vector<DataItem>>& storage) {
@@ -499,29 +497,33 @@ void collectModuleOutput(const std::string& moduleName, FILE* pipe, std::map<std
       std::string line = lineBuffer.substr(0, pos);
       lineBuffer = lineBuffer.substr(pos + 1);
 
+      line = trimString(line);
       if (line.empty()) continue;
 
       if (line[0] == '{') {
+        // Es JSON - usar parseBMOPLine para procesar
+        parseBMOPLine(line, storage);
+
+        // Verificar si fue un batch start
         if (line.find("\"t\":\"batch\"") != std::string::npos) {
           inBatch = true;
+          // Obtener el formato del batch del storage
           if (!storage["__batch_format__"].empty()) {
             batchFormat = storage["__batch_format__"][0].format;
+            // Limpiar la entrada temporal
             storage["__batch_format__"].clear();
           }
-          parseBMOPLine(line, storage);
         }
+        // Verificar si fue un batch end
         else if (line.find("\"t\":\"batch_end\"") != std::string::npos) {
           inBatch = false;
           batchFormat.clear();
         }
-        else {
-          parseBMOPLine(line, storage);
-        }
-      }
-      else if (inBatch && !batchFormat.empty()) {
+      } else if (inBatch && !batchFormat.empty()) {
+        // ⭐⭐ CRÍTICO: Línea dentro de un batch - GUARDAR EN STORAGE
         DataItem item;
         item.format = batchFormat;
-        item.value = line;
+        item.value = line;  // La línea cruda (ej: "example.com")
         storage[batchFormat].push_back(item);
       }
     }
@@ -550,7 +552,8 @@ void pipeDataToModule(FILE* pipe, const std::map<std::string, std::vector<DataIt
   }
 }
 
-void runModuleWithPipe(const std::string& moduleName, const std::vector<std::string>& args, 
+/*
+void runModuleWithPipe(const std::string& moduleName, const std::vector<std::string>& args,
                        std::map<std::string, std::vector<DataItem>>& storage,
                        const std::string& consumesFormat) {
   std::string fullPath = findModulePath(moduleName);
@@ -562,6 +565,19 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
   ModuleMetadata meta = parseModuleMetadata(fullPath);
   std::string moduleDir = fs::path(fullPath).parent_path().string();
 
+  // DEBUG: Mostrar storage antes de ejecutar
+  std::cout << "[DEBUG] ====== START " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] Before execution - storage contents:" << std::endl;
+  int total_items_before = 0;
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_before += items.size();
+  }
+  std::cout << "[DEBUG] Total items in storage: " << total_items_before << std::endl;
+  std::cout << "[DEBUG] Module consumes format: '" << consumesFormat << "'" << std::endl;
+
+  // Configurar entorno según el tipo de módulo
   if (fullPath.ends_with(".js")) {
     if (!meta.installCmd.empty() && meta.installScope != "global") {
       std::string nodeDir = setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
@@ -587,20 +603,20 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
     }
   }
 
+  // Determinar el comando de ejecución
   std::string runner;
   if (fullPath.ends_with(".js")) {
-    runner = "node ";
+    runner = "node";
   } else if (fullPath.ends_with(".py")) {
-    runner = getPythonVersion(fullPath) + " ";
+    runner = getPythonVersion(fullPath) + " -u";  // CRÍTICO: -u para unbuffered
+    std::cout << "[DEBUG] Using Python runner with -u flag: " << runner << std::endl;
   } else if (fullPath.ends_with(".sh")) {
-    runner = "bash ";
+    runner = "bash";
   }
 
-  if (runner.empty()) return;
-
-  std::string cmd = runner + fullPath;
-  for (const auto& arg : args) {
-    cmd += " " + arg;
+  if (runner.empty()) {
+    std::cout << "[-] No runner found for module: " << moduleName << std::endl;
+    return;
   }
 
   std::cout << "------------------------------------------" << std::endl;
@@ -610,42 +626,1238 @@ void runModuleWithPipe(const std::string& moduleName, const std::vector<std::str
   }
   std::cout << std::endl;
 
+  // Construir el comando completo
+  std::string cmd = runner + " " + fullPath;
+  for (const auto& arg : args) {
+    cmd += " " + arg;
+  }
+  std::cout << "[DEBUG] Full command: " << cmd << std::endl;
+
+  // ===================================================================
+  // 🔧 MÓDULOS QUE CONSUMEN DATOS (consumesFormat no vacío)
+  // ===================================================================
   if (!consumesFormat.empty()) {
-    FILE* writeP = popen(cmd.c_str(), "w");
-    if (!writeP) {
+    std::cout << "[DEBUG] ====== MODULE CONSUMES DATA ======" << std::endl;
+    std::cout << "[DEBUG] Setting up bidirectional pipes..." << std::endl;
+    
+    int stdin_pipe[2];   // [0] = read end, [1] = write end
+    int stdout_pipe[2];  // [0] = read end, [1] = write end
+    
+    if (pipe(stdin_pipe) != 0) {
+      std::cout << "[-] Failed to create stdin pipe" << std::endl;
+      return;
+    }
+    if (pipe(stdout_pipe) != 0) {
+      std::cout << "[-] Failed to create stdout pipe" << std::endl;
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      return;
+    }
+    
+    std::cout << "[DEBUG] Pipes created successfully" << std::endl;
+    std::cout << "[DEBUG] Forking process..." << std::endl;
+    
+    pid_t pid = fork();
+    if (pid == 0) {
+      // ========================
+      // PROCESO HIJO (módulo)
+      // ========================
+      std::cout << "[DEBUG] CHILD PROCESS: Setting up stdin/stdout" << std::endl;
+      
+      // Redirigir stdin a leer del pipe
+      close(stdin_pipe[1]);  // Cerrar extremo de escritura del stdin pipe
+      dup2(stdin_pipe[0], STDIN_FILENO);  // stdin del hijo lee del pipe
+      close(stdin_pipe[0]);
+      
+      // Redirigir stdout a escribir al pipe
+      close(stdout_pipe[0]);  // Cerrar extremo de lectura del stdout pipe
+      dup2(stdout_pipe[1], STDOUT_FILENO);  // stdout del hijo escribe en el pipe
+      close(stdout_pipe[1]);
+      
+      // Preparar argumentos para execvp
+      std::vector<char*> exec_args;
+      std::istringstream iss(cmd);
+      std::string token;
+      
+      // Parsear comando en tokens
+      while (iss >> token) {
+        char* arg = new char[token.size() + 1];
+        strcpy(arg, token.c_str());
+        exec_args.push_back(arg);
+      }
+      exec_args.push_back(nullptr);  // NULL-terminated array
+      
+      std::cout << "[DEBUG] CHILD: Executing command: " << cmd << std::endl;
+      
+      // Ejecutar módulo
+      execvp(exec_args[0], exec_args.data());
+      
+      // Si llegamos aquí, execvp falló
+      std::cerr << "[DEBUG] CHILD: execvp FAILED! Error: " << strerror(errno) << std::endl;
+      
+      // Liberar memoria
+      for (auto& arg : exec_args) {
+        if (arg) delete[] arg;
+      }
+      
+      exit(EXIT_FAILURE);
+    } 
+    else if (pid > 0) {
+      // ========================
+      // PROCESO PADRE (bahamut)
+      // ========================
+      std::cout << "[DEBUG] PARENT PROCESS: Child PID = " << pid << std::endl;
+      
+      // Cerrar extremos no usados
+      close(stdin_pipe[0]);   // No necesitamos leer del stdin pipe en el padre
+      close(stdout_pipe[1]);  // No necesitamos escribir en el stdout pipe
+      
+      // 1. ESCRIBIR DATOS AL MÓDULO (stdin del hijo)
+      std::cout << "[DEBUG] PARENT: Writing data to module's stdin..." << std::endl;
+      FILE* writePipe = fdopen(stdin_pipe[1], "w");
+      if (!writePipe) {
+        std::cout << "[-] Failed to open write pipe" << std::endl;
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        return;
+      }
+      
+      int items_sent = 0;
+      int formats_sent = 0;
+      
+      if (consumesFormat == "*") {
+        std::cout << "[DEBUG] PARENT: Sending ALL formats from storage" << std::endl;
+        for (const auto& [format, items] : storage) {
+          if (format == "__batch_format__") continue;
+          
+          std::cout << "[DEBUG] PARENT:   Format '" << format << "' has " 
+                    << items.size() << " items" << std::endl;
+          
+          if (items.empty()) continue;
+          
+          formats_sent++;
+          for (const auto& item : items) {
+            // Enviar cada item como JSON BMOP
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                    item.format.c_str(), item.value.c_str());
+            items_sent++;
+            
+            // Log cada 1000 items
+            if (items_sent % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Sent " << items_sent << " items so far..." << std::endl;
+            }
+          }
+        }
+      } else {
+        std::cout << "[DEBUG] PARENT: Sending specific format: '" << consumesFormat << "'" << std::endl;
+        auto it = storage.find(consumesFormat);
+        if (it != storage.end() && !it->second.empty()) {
+          formats_sent = 1;
+          for (const auto& item : it->second) {
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                    item.format.c_str(), item.value.c_str());
+            items_sent++;
+          }
+        } else {
+          std::cout << "[DEBUG] PARENT: No data found for format '" << consumesFormat << "'" << std::endl;
+        }
+      }
+      
+      std::cout << "[DEBUG] PARENT: Finished writing. Total: " 
+                << items_sent << " items from " << formats_sent << " formats" << std::endl;
+      
+      // IMPORTANTE: Cerrar write pipe para indicar EOF al módulo
+      fflush(writePipe);
+      fclose(writePipe);
+      std::cout << "[DEBUG] PARENT: Write pipe closed (EOF sent to module)" << std::endl;
+      
+      // 2. LEER SALIDA DEL MÓDULO (stdout del hijo)
+      std::cout << "[DEBUG] PARENT: Reading module output from stdout..." << std::endl;
+      FILE* readPipe = fdopen(stdout_pipe[0], "r");
+      if (!readPipe) {
+        std::cout << "[-] Failed to open read pipe" << std::endl;
+        close(stdout_pipe[0]);
+        return;
+      }
+      
+      // Configuración para procesamiento de batch
+      char buffer[4096];
+      std::string lineBuffer;
+      std::string batchFormat;
+      bool inBatch = false;
+      int items_collected = 0;
+      int lines_read = 0;
+      
+      while (fgets(buffer, sizeof(buffer), readPipe)) {
+        lines_read++;
+        
+        // Mostrar salida en tiempo real
+        std::cout << buffer;
+        
+        // Procesar para capturar datos BMOP
+        std::string chunk(buffer);
+        lineBuffer += chunk;
+        
+        size_t pos;
+        while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+          std::string line = lineBuffer.substr(0, pos);
+          lineBuffer = lineBuffer.substr(pos + 1);
+          
+          line = trimString(line);
+          if (line.empty()) continue;
+          
+          // Línea es JSON (empieza con '{')
+          if (line[0] == '{') {
+            // Procesar con parseBMOPLine
+            parseBMOPLine(line, storage);
+            
+            // Verificar si es inicio de batch
+            if (line.find("\"t\":\"batch\"") != std::string::npos) {
+              inBatch = true;
+              std::cout << "[DEBUG] PARENT: Batch START detected" << std::endl;
+              if (!storage["__batch_format__"].empty()) {
+                batchFormat = storage["__batch_format__"][0].format;
+                storage["__batch_format__"].clear();
+                std::cout << "[DEBUG] PARENT: Batch format: " << batchFormat << std::endl;
+              }
+            }
+            // Verificar si es fin de batch
+            else if (line.find("\"t\":\"batch_end\"") != std::string::npos) {
+              inBatch = false;
+              std::cout << "[DEBUG] PARENT: Batch END detected. Total collected: " 
+                        << storage[batchFormat].size() << " items" << std::endl;
+              batchFormat.clear();
+            }
+          }
+          // Línea dentro de batch (datos crudos)
+          else if (inBatch && !batchFormat.empty()) {
+            DataItem item;
+            item.format = batchFormat;
+            item.value = line;
+            storage[batchFormat].push_back(item);
+            items_collected++;
+            
+            // Log cada 1000 items recolectados
+            if (items_collected % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Collected " << items_collected 
+                        << " items from batch" << std::endl;
+            }
+          }
+        }
+      }
+      
+      std::cout << "[DEBUG] PARENT: Finished reading module output" << std::endl;
+      std::cout << "[DEBUG] PARENT: Lines read: " << lines_read << std::endl;
+      std::cout << "[DEBUG] PARENT: Items collected: " << items_collected << std::endl;
+      
+      fclose(readPipe);
+      
+      // 3. ESPERAR A QUE EL MÓDULO TERMINE
+      std::cout << "[DEBUG] PARENT: Waiting for module to finish..." << std::endl;
+      int status;
+      waitpid(pid, &status, 0);
+      
+      if (WIFEXITED(status)) {
+        std::cout << "[DEBUG] PARENT: Module exited with status: " << WEXITSTATUS(status) << std::endl;
+      } else if (WIFSIGNALED(status)) {
+        std::cout << "[DEBUG] PARENT: Module terminated by signal: " << WTERMSIG(status) << std::endl;
+      }
+      
+      std::cout << "[DEBUG] PARENT: Data sent to module: " << items_sent << " items" << std::endl;
+      std::cout << "[DEBUG] PARENT: Data received from module: " << items_collected << " items" << std::endl;
+      
+    } else {
+      // Error en fork
+      std::cout << "[-] Fork failed" << std::endl;
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+      return;
+    }
+  }
+  // ===================================================================
+  // 🔧 MÓDULOS QUE NO CONSUMEN DATOS (solo generan)
+  // ===================================================================
+  else {
+    std::cout << "[DEBUG] ====== MODULE GENERATES DATA ONLY ======" << std::endl;
+    
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
       std::cout << "[-] Failed to execute module" << std::endl;
       return;
     }
-
-    pipeDataToModule(writeP, storage, consumesFormat);
-    pclose(writeP);
-
-    FILE* readP = popen(cmd.c_str(), "r");
-    if (readP) {
-      collectModuleOutput(moduleName, readP, storage);
-      pclose(readP);
+    
+    char buffer[4096];
+    std::string lineBuffer;
+    std::string batchFormat;
+    bool inBatch = false;
+    int items_collected = 0;
+    int lines_read = 0;
+    
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+      lines_read++;
+      
+      // Mostrar salida en tiempo real
+      std::cout << buffer;
+      
+      // Procesar para capturar datos BMOP
+      std::string chunk(buffer);
+      lineBuffer += chunk;
+      
+      size_t pos;
+      while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+        std::string line = lineBuffer.substr(0, pos);
+        lineBuffer = lineBuffer.substr(pos + 1);
+        
+        line = trimString(line);
+        if (line.empty()) continue;
+        
+        // Línea es JSON
+        if (line[0] == '{') {
+          parseBMOPLine(line, storage);
+          
+          // Detectar inicio de batch
+          if (line.find("\"t\":\"batch\"") != std::string::npos) {
+            inBatch = true;
+            std::cout << "[DEBUG] Batch START detected" << std::endl;
+            if (!storage["__batch_format__"].empty()) {
+              batchFormat = storage["__batch_format__"][0].format;
+              storage["__batch_format__"].clear();
+              std::cout << "[DEBUG] Batch format: " << batchFormat << std::endl;
+            }
+          }
+          // Detectar fin de batch
+          else if (line.find("\"t\":\"batch_end\"") != std::string::npos) {
+            inBatch = false;
+            std::cout << "[DEBUG] Batch END detected. Total " << batchFormat 
+                      << " items: " << storage[batchFormat].size() << std::endl;
+            batchFormat.clear();
+          }
+        }
+        // Línea dentro de batch (datos crudos)
+        else if (inBatch && !batchFormat.empty()) {
+          DataItem item;
+          item.format = batchFormat;
+          item.value = line;
+          storage[batchFormat].push_back(item);
+          items_collected++;
+          
+          if (items_collected % 1000 == 0) {
+            std::cout << "[DEBUG] Collected " << items_collected 
+                      << " " << batchFormat << " items so far..." << std::endl;
+          }
+        }
+      }
     }
-  } else {
+    
+    int pclose_status = pclose(pipe);
+    if (pclose_status != 0) {
+      std::cout << "[DEBUG] Module exited with non-zero status: " << pclose_status << std::endl;
+    }
+    
+    std::cout << "[DEBUG] Total lines read: " << lines_read << std::endl;
+    std::cout << "[DEBUG] Total items collected: " << items_collected << std::endl;
+  }
+  
+  // DEBUG: Mostrar storage después de ejecutar
+  std::cout << "[DEBUG] ====== END " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] After execution - storage contents:" << std::endl;
+  int total_items_after = 0;
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_after += items.size();
+  }
+  std::cout << "[DEBUG] Total items in storage: " << total_items_after << std::endl;
+  std::cout << "[DEBUG] Net change: +" << (total_items_after - total_items_before) << " items" << std::endl;
+  
+  // Mostrar ejemplos de datos si hay muchos
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    if (!items.empty() && items.size() <= 5) {
+      std::cout << "[DEBUG] Sample of " << format << " items:" << std::endl;
+      for (size_t i = 0; i < std::min(items.size(), size_t(3)); i++) {
+        std::cout << "[DEBUG]   [" << i << "] " << items[i].value << std::endl;
+      }
+    }
+  }
+}
+*/
+
+/*
+void runModuleWithPipe(const std::string& moduleName, const std::vector<std::string>& args,
+                       std::map<std::string, std::vector<DataItem>>& storage,
+                       const std::string& consumesFormat) {
+  std::string fullPath = findModulePath(moduleName);
+  if (fullPath.empty()) {
+    std::cout << "[-] Error: Module " << moduleName << " not found." << std::endl;
+    return;
+  }
+
+  ModuleMetadata meta = parseModuleMetadata(fullPath);
+  std::string moduleDir = fs::path(fullPath).parent_path().string();
+
+  // DEBUG: Mostrar storage antes de ejecutar
+  std::cout << "[DEBUG] ====== START " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] Before execution - storage contents:" << std::endl;
+  int total_items_before = 0;
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_before += items.size();
+  }
+  std::cout << "[DEBUG] Total items in storage: " << total_items_before << std::endl;
+  std::cout << "[DEBUG] Module consumes format: '" << consumesFormat << "'" << std::endl;
+
+  // Configurar entorno según el tipo de módulo
+  if (fullPath.ends_with(".js")) {
+    if (!meta.installCmd.empty() && meta.installScope != "global") {
+      std::string nodeDir = setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
+      if (!fs::exists(nodeDir)) {
+        std::cout << "[!] Dependencies not found. Installing..." << std::endl;
+        installModule(moduleName);
+        setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
+      }
+    } else {
+      setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
+    }
+  }
+  else if (fullPath.ends_with(".py")) {
+    if (!meta.installCmd.empty() && meta.installScope != "global") {
+      std::string pythonLibs = setupPythonEnvironment(fullPath, meta.installScope, moduleDir);
+      if (!fs::exists(pythonLibs)) {
+        std::cout << "[!] Dependencies not found. Installing..." << std::endl;
+        installModule(moduleName);
+        setupPythonEnvironment(fullPath, meta.installScope, moduleDir);
+      }
+    } else {
+      setupPythonEnvironment(fullPath, meta.installScope, moduleDir);
+    }
+  }
+
+  // Determinar el comando de ejecución
+  std::string runner;
+  if (fullPath.ends_with(".js")) {
+    runner = "node";
+  } else if (fullPath.ends_with(".py")) {
+    runner = getPythonVersion(fullPath) + " -u";  // CRÍTICO: -u para unbuffered
+    std::cout << "[DEBUG] Using Python runner with -u flag: " << runner << std::endl;
+  } else if (fullPath.ends_with(".sh")) {
+    runner = "bash";
+  }
+
+  if (runner.empty()) {
+    std::cout << "[-] No runner found for module: " << moduleName << std::endl;
+    return;
+  }
+
+  std::cout << "------------------------------------------" << std::endl;
+  std::cout << "Running (" << meta.installScope << "): " << moduleName;
+  if (!consumesFormat.empty()) {
+    std::cout << " [consumes: " << consumesFormat << "]";
+  }
+  std::cout << std::endl;
+
+  // Construir el comando completo
+  std::string cmd = runner + " " + fullPath;
+  for (const auto& arg : args) {
+    cmd += " " + arg;
+  }
+  std::cout << "[DEBUG] Full command: " << cmd << std::endl;
+
+  // ===================================================================
+  // 🔧 MÓDULOS QUE CONSUMEN DATOS (consumesFormat no vacío)
+  // ===================================================================
+  if (!consumesFormat.empty()) {
+    std::cout << "[DEBUG] ====== MODULE CONSUMES DATA ======" << std::endl;
+    std::cout << "[DEBUG] Setting up bidirectional pipes..." << std::endl;
+
+    int stdin_pipe[2];   // [0] = read end, [1] = write end
+    int stdout_pipe[2];  // [0] = read end, [1] = write end
+
+    if (pipe(stdin_pipe) != 0) {
+      std::cout << "[-] Failed to create stdin pipe" << std::endl;
+      return;
+    }
+    if (pipe(stdout_pipe) != 0) {
+      std::cout << "[-] Failed to create stdout pipe" << std::endl;
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      return;
+    }
+
+    std::cout << "[DEBUG] Pipes created successfully" << std::endl;
+    std::cout << "[DEBUG] Forking process..." << std::endl;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+      // ========================
+      // PROCESO HIJO (módulo)
+      // ========================
+      std::cout << "[DEBUG] CHILD PROCESS: Setting up stdin/stdout" << std::endl;
+
+      // Redirigir stdin a leer del pipe
+      close(stdin_pipe[1]);  // Cerrar extremo de escritura del stdin pipe
+      dup2(stdin_pipe[0], STDIN_FILENO);  // stdin del hijo lee del pipe
+      close(stdin_pipe[0]);
+
+      // Redirigir stdout a escribir al pipe
+      close(stdout_pipe[0]);  // Cerrar extremo de lectura del stdout pipe
+      dup2(stdout_pipe[1], STDOUT_FILENO);  // stdout del hijo escribe en el pipe
+      close(stdout_pipe[1]);
+
+      // Preparar argumentos para execvp
+      std::vector<char*> exec_args;
+      std::istringstream iss(cmd);
+      std::string token;
+
+      // Parsear comando en tokens
+      while (iss >> token) {
+        char* arg = new char[token.size() + 1];
+        strcpy(arg, token.c_str());
+        exec_args.push_back(arg);
+      }
+      exec_args.push_back(nullptr);  // NULL-terminated array
+
+      std::cout << "[DEBUG] CHILD: Executing command: " << cmd << std::endl;
+
+      // Ejecutar módulo
+      execvp(exec_args[0], exec_args.data());
+
+      // Si llegamos aquí, execvp falló
+      std::cerr << "[DEBUG] CHILD: execvp FAILED! Error: " << strerror(errno) << std::endl;
+
+      // Liberar memoria
+      for (auto& arg : exec_args) {
+        if (arg) delete[] arg;
+      }
+
+      exit(EXIT_FAILURE);
+    }
+    else if (pid > 0) {
+      // ========================
+      // PROCESO PADRE (bahamut)
+      // ========================
+      std::cout << "[DEBUG] PARENT PROCESS: Child PID = " << pid << std::endl;
+
+      // Cerrar extremos no usados
+      close(stdin_pipe[0]);   // No necesitamos leer del stdin pipe en el padre
+      close(stdout_pipe[1]);  // No necesitamos escribir en el stdout pipe
+
+      // 1. ESCRIBIR DATOS AL MÓDULO (stdin del hijo)
+      std::cout << "[DEBUG] PARENT: Writing data to module's stdin..." << std::endl;
+      FILE* writePipe = fdopen(stdin_pipe[1], "w");
+      if (!writePipe) {
+        std::cout << "[-] Failed to open write pipe" << std::endl;
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        return;
+      }
+
+      int items_sent = 0;
+      int formats_sent = 0;
+
+      if (consumesFormat == "*") {
+        std::cout << "[DEBUG] PARENT: Sending ALL formats from storage" << std::endl;
+        for (const auto& [format, items] : storage) {
+          if (format == "__batch_format__") continue;
+
+          std::cout << "[DEBUG] PARENT:   Format '" << format << "' has "
+                    << items.size() << " items" << std::endl;
+
+          if (items.empty()) continue;
+
+          formats_sent++;
+          for (const auto& item : items) {
+            // Enviar cada item como JSON BMOP
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                    item.format.c_str(), item.value.c_str());
+            items_sent++;
+
+            // Log cada 1000 items
+            if (items_sent % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Sent " << items_sent << " items so far..." << std::endl;
+            }
+          }
+        }
+      } else {
+        std::cout << "[DEBUG] PARENT: Sending specific format: '" << consumesFormat << "'" << std::endl;
+        auto it = storage.find(consumesFormat);
+        if (it != storage.end() && !it->second.empty()) {
+          formats_sent = 1;
+          for (const auto& item : it->second) {
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                    item.format.c_str(), item.value.c_str());
+            items_sent++;
+          }
+        } else {
+          std::cout << "[DEBUG] PARENT: No data found for format '" << consumesFormat << "'" << std::endl;
+        }
+      }
+
+      std::cout << "[DEBUG] PARENT: Finished writing. Total: "
+                << items_sent << " items from " << formats_sent << " formats" << std::endl;
+
+      // IMPORTANTE: Cerrar write pipe para indicar EOF al módulo
+      fflush(writePipe);
+      fclose(writePipe);
+      std::cout << "[DEBUG] PARENT: Write pipe closed (EOF sent to module)" << std::endl;
+
+      // 2. LEER SALIDA DEL MÓDULO (stdout del hijo)
+      std::cout << "[DEBUG] PARENT: Reading module output from stdout..." << std::endl;
+      FILE* readPipe = fdopen(stdout_pipe[0], "r");
+      if (!readPipe) {
+        std::cout << "[-] Failed to open read pipe" << std::endl;
+        close(stdout_pipe[0]);
+        return;
+      }
+
+      // Configuración para procesamiento de batch
+      char buffer[4096];
+      std::string lineBuffer;
+      std::string batchFormat;
+      bool inBatch = false;
+      int items_collected = 0;
+      int lines_read = 0;
+
+      while (fgets(buffer, sizeof(buffer), readPipe)) {
+        lines_read++;
+
+        // Mostrar salida en tiempo real
+        std::cout << buffer;
+
+        // Procesar para capturar datos BMOP
+        std::string chunk(buffer);
+        lineBuffer += chunk;
+
+        size_t pos;
+        while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+          std::string line = lineBuffer.substr(0, pos);
+          lineBuffer = lineBuffer.substr(pos + 1);
+
+          line = trimString(line);
+          if (line.empty()) continue;
+
+          // Línea es JSON (empieza con '{')
+          if (line[0] == '{') {
+            // Procesar con parseBMOPLine
+            parseBMOPLine(line, storage);
+
+            // Verificar si es inicio de batch
+            if (line.find("\"t\":\"batch\"") != std::string::npos) {
+              inBatch = true;
+              std::cout << "[DEBUG] PARENT: Batch START detected" << std::endl;
+              if (!storage["__batch_format__"].empty()) {
+                batchFormat = storage["__batch_format__"][0].format;
+                storage["__batch_format__"].clear();
+                std::cout << "[DEBUG] PARENT: Batch format: " << batchFormat << std::endl;
+              }
+            }
+            // Verificar si es fin de batch
+            else if (line.find("\"t\":\"batch_end\"") != std::string::npos) {
+              inBatch = false;
+              std::cout << "[DEBUG] PARENT: Batch END detected. Total collected: "
+                        << storage[batchFormat].size() << " items" << std::endl;
+              batchFormat.clear();
+            }
+          }
+          // Línea dentro de batch (datos crudos)
+          else if (inBatch && !batchFormat.empty()) {
+            DataItem item;
+            item.format = batchFormat;
+            item.value = line;
+            storage[batchFormat].push_back(item);
+            items_collected++;
+
+            // Log cada 1000 items recolectados
+            if (items_collected % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Collected " << items_collected
+                        << " items from batch" << std::endl;
+            }
+          }
+        }
+      }
+
+      std::cout << "[DEBUG] PARENT: Finished reading module output" << std::endl;
+      std::cout << "[DEBUG] PARENT: Lines read: " << lines_read << std::endl;
+      std::cout << "[DEBUG] PARENT: Items collected: " << items_collected << std::endl;
+
+      fclose(readPipe);
+
+      // 3. ESPERAR A QUE EL MÓDULO TERMINE
+      std::cout << "[DEBUG] PARENT: Waiting for module to finish..." << std::endl;
+      int status;
+      waitpid(pid, &status, 0);
+
+      if (WIFEXITED(status)) {
+        std::cout << "[DEBUG] PARENT: Module exited with status: " << WEXITSTATUS(status) << std::endl;
+      } else if (WIFSIGNALED(status)) {
+        std::cout << "[DEBUG] PARENT: Module terminated by signal: " << WTERMSIG(status) << std::endl;
+      }
+
+      std::cout << "[DEBUG] PARENT: Data sent to module: " << items_sent << " items" << std::endl;
+      std::cout << "[DEBUG] PARENT: Data received from module: " << items_collected << " items" << std::endl;
+
+    } else {
+      // Error en fork
+      std::cout << "[-] Fork failed" << std::endl;
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+      return;
+    }
+  }
+  // ===================================================================
+  // 🔧 MÓDULOS QUE NO CONSUMEN DATOS (solo generan) - ¡BUG AQUÍ!
+  // ===================================================================
+  else {
+    std::cout << "[DEBUG] ====== MODULE GENERATES DATA ONLY ======" << std::endl;
+
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
       std::cout << "[-] Failed to execute module" << std::endl;
       return;
     }
 
-    char buffer[512];
+    char buffer[4096];
+    std::string lineBuffer;
+    std::string batchFormat;
+    bool inBatch = false;
+    int items_collected = 0;
+    int lines_read = 0;
+
     while (fgets(buffer, sizeof(buffer), pipe)) {
+      lines_read++;
+
+      // Mostrar salida en tiempo real
       std::cout << buffer;
+
+      // Procesar para capturar datos BMOP
+      std::string chunk(buffer);
+      lineBuffer += chunk;
+
+      size_t pos;
+      while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+        std::string line = lineBuffer.substr(0, pos);
+        lineBuffer = lineBuffer.substr(pos + 1);
+
+        line = trimString(line);
+        if (line.empty()) continue;
+
+        // Línea es JSON
+        if (line[0] == '{') {
+          // ⭐⭐ IMPORTANTE: Procesar la línea JSON primero
+          parseBMOPLine(line, storage);
+
+          // Detectar inicio de batch
+          if (line.find("\"t\":\"batch\"") != std::string::npos) {
+            inBatch = true;
+            std::cout << "[DEBUG] Batch START detected" << std::endl;
+            if (!storage["__batch_format__"].empty()) {
+              batchFormat = storage["__batch_format__"][0].format;
+              storage["__batch_format__"].clear();
+              std::cout << "[DEBUG] Batch format: " << batchFormat << std::endl;
+            }
+          }
+          // Detectar fin de batch
+          else if (line.find("\"t\":\"batch_end\"") != std::string::npos) {
+            inBatch = false;
+            std::cout << "[DEBUG] Batch END detected. Total " << batchFormat
+                      << " items: " << storage[batchFormat].size() << std::endl;
+            batchFormat.clear();
+          }
+        }
+        // ⭐⭐ ¡BUG CRÍTICO CORREGIDO AQUÍ!
+        // Línea dentro de batch (datos crudos como "example.com")
+        else if (inBatch && !batchFormat.empty()) {
+          // ⭐⭐ ¡GUARDAR EN STORAGE!
+          DataItem item;
+          item.format = batchFormat;
+          item.value = line;
+          storage[batchFormat].push_back(item);
+          items_collected++;
+
+          if (items_collected % 1000 == 0) {
+            std::cout << "[DEBUG] Collected " << items_collected
+                      << " " << batchFormat << " items so far..." << std::endl;
+          }
+        } else {
+          // ⭐⭐ DEBUG: Mostrar líneas no procesadas
+          std::cout << "[DEBUG] Line not processed - inBatch: " << inBatch
+                    << ", batchFormat: " << batchFormat << ", line: '" << line << "'" << std::endl;
+        }
+      }
     }
 
-    pclose(pipe);
+    int pclose_status = pclose(pipe);
+    if (pclose_status != 0) {
+      std::cout << "[DEBUG] Module exited with non-zero status: " << pclose_status << std::endl;
+    }
 
-    FILE* collectPipe = popen(cmd.c_str(), "r");
-    if (collectPipe) {
-      collectModuleOutput(moduleName, collectPipe, storage);
-      pclose(collectPipe);
+    std::cout << "[DEBUG] Total lines read: " << lines_read << std::endl;
+    std::cout << "[DEBUG] Total items collected: " << items_collected << std::endl;
+  }
+
+  // DEBUG: Mostrar storage después de ejecutar
+  std::cout << "[DEBUG] ====== END " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] After execution - storage contents:" << std::endl;
+  int total_items_after = 0;
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_after += items.size();
+  }
+  std::cout << "[DEBUG] Total items in storage: " << total_items_after << std::endl;
+  std::cout << "[DEBUG] Net change: +" << (total_items_after - total_items_before) << " items" << std::endl;
+
+  // Mostrar ejemplos de datos si hay muchos
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    if (!items.empty()) {
+      std::cout << "[DEBUG] Sample of " << format << " items (first 3):" << std::endl;
+      for (size_t i = 0; i < std::min(items.size(), size_t(3)); i++) {
+        std::cout << "[DEBUG]   [" << i << "] " << items[i].value << std::endl;
+      }
     }
   }
 }
+*/
+
+void runModuleWithPipe(const std::string& moduleName, const std::vector<std::string>& args,
+                       std::map<std::string, std::vector<DataItem>>& storage,
+                       const std::string& consumesFormat) {
+  std::string fullPath = findModulePath(moduleName);
+  if (fullPath.empty()) {
+    std::cout << "[-] Error: Module " << moduleName << " not found." << std::endl;
+    return;
+  }
+
+  ModuleMetadata meta = parseModuleMetadata(fullPath);
+  std::string moduleDir = fs::path(fullPath).parent_path().string();
+
+  // DEBUG: Mostrar storage antes de ejecutar
+  std::cout << "[DEBUG] ====== START " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] Before execution - storage contents:" << std::endl;
+  int total_items_before = 0;
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_before += items.size();
+  }
+  std::cout << "[DEBUG] Total items in storage: " << total_items_before << std::endl;
+  std::cout << "[DEBUG] Module consumes format: '" << consumesFormat << "'" << std::endl;
+
+  // Configurar entorno según el tipo de módulo
+  if (fullPath.ends_with(".js")) {
+    if (!meta.installCmd.empty() && meta.installScope != "global") {
+      std::string nodeDir = setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
+      if (!fs::exists(nodeDir)) {
+        std::cout << "[!] Dependencies not found. Installing..." << std::endl;
+        installModule(moduleName);
+        setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
+      }
+    } else {
+      setupNodeEnvironment(fullPath, meta.installScope, moduleDir);
+    }
+  }
+  else if (fullPath.ends_with(".py")) {
+    if (!meta.installCmd.empty() && meta.installScope != "global") {
+      std::string pythonLibs = setupPythonEnvironment(fullPath, meta.installScope, moduleDir);
+      if (!fs::exists(pythonLibs)) {
+        std::cout << "[!] Dependencies not found. Installing..." << std::endl;
+        installModule(moduleName);
+        setupPythonEnvironment(fullPath, meta.installScope, moduleDir);
+      }
+    } else {
+      setupPythonEnvironment(fullPath, meta.installScope, moduleDir);
+    }
+  }
+
+  // Determinar el comando de ejecución
+  std::string runner;
+  if (fullPath.ends_with(".js")) {
+    runner = "node";
+  } else if (fullPath.ends_with(".py")) {
+    runner = getPythonVersion(fullPath) + " -u";  // CRÍTICO: -u para unbuffered
+    std::cout << "[DEBUG] Using Python runner with -u flag: " << runner << std::endl;
+  } else if (fullPath.ends_with(".sh")) {
+    runner = "bash";
+  }
+
+  if (runner.empty()) {
+    std::cout << "[-] No runner found for module: " << moduleName << std::endl;
+    return;
+  }
+
+  std::cout << "------------------------------------------" << std::endl;
+  std::cout << "Running (" << meta.installScope << "): " << moduleName;
+  if (!consumesFormat.empty()) {
+    std::cout << " [consumes: " << consumesFormat << "]";
+  }
+  std::cout << std::endl;
+
+  // Construir el comando completo
+  std::string cmd = runner + " " + fullPath;
+  for (const auto& arg : args) {
+    cmd += " " + arg;
+  }
+  std::cout << "[DEBUG] Full command: " << cmd << std::endl;
+
+  // ===================================================================
+  // 🔧 MÓDULOS QUE CONSUMEN DATOS (consumesFormat no vacío)
+  // ===================================================================
+  if (!consumesFormat.empty()) {
+    std::cout << "[DEBUG] ====== MODULE CONSUMES DATA ======" << std::endl;
+    std::cout << "[DEBUG] Setting up bidirectional pipes..." << std::endl;
+    
+    int stdin_pipe[2];   // [0] = read end, [1] = write end
+    int stdout_pipe[2];  // [0] = read end, [1] = write end
+    
+    if (pipe(stdin_pipe) != 0) {
+      std::cout << "[-] Failed to create stdin pipe" << std::endl;
+      return;
+    }
+    if (pipe(stdout_pipe) != 0) {
+      std::cout << "[-] Failed to create stdout pipe" << std::endl;
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      return;
+    }
+    
+    std::cout << "[DEBUG] Pipes created successfully" << std::endl;
+    std::cout << "[DEBUG] Forking process..." << std::endl;
+    
+    pid_t pid = fork();
+    if (pid == 0) {
+      // ========================
+      // PROCESO HIJO (módulo)
+      // ========================
+      std::cout << "[DEBUG] CHILD PROCESS: Setting up stdin/stdout" << std::endl;
+      
+      // Redirigir stdin a leer del pipe
+      close(stdin_pipe[1]);  // Cerrar extremo de escritura del stdin pipe
+      dup2(stdin_pipe[0], STDIN_FILENO);  // stdin del hijo lee del pipe
+      close(stdin_pipe[0]);
+      
+      // Redirigir stdout a escribir al pipe
+      close(stdout_pipe[0]);  // Cerrar extremo de lectura del stdout pipe
+      dup2(stdout_pipe[1], STDOUT_FILENO);  // stdout del hijo escribe en el pipe
+      close(stdout_pipe[1]);
+      
+      // Preparar argumentos para execvp
+      std::vector<char*> exec_args;
+      std::istringstream iss(cmd);
+      std::string token;
+      
+      // Parsear comando en tokens
+      while (iss >> token) {
+        char* arg = new char[token.size() + 1];
+        strcpy(arg, token.c_str());
+        exec_args.push_back(arg);
+      }
+      exec_args.push_back(nullptr);  // NULL-terminated array
+      
+      std::cout << "[DEBUG] CHILD: Executing command: " << cmd << std::endl;
+      
+      // Ejecutar módulo
+      execvp(exec_args[0], exec_args.data());
+      
+      // Si llegamos aquí, execvp falló
+      std::cerr << "[DEBUG] CHILD: execvp FAILED! Error: " << strerror(errno) << std::endl;
+      
+      // Liberar memoria
+      for (auto& arg : exec_args) {
+        if (arg) delete[] arg;
+      }
+      
+      exit(EXIT_FAILURE);
+    } 
+    else if (pid > 0) {
+      // ========================
+      // PROCESO PADRE (bahamut)
+      // ========================
+      std::cout << "[DEBUG] PARENT PROCESS: Child PID = " << pid << std::endl;
+      
+      // Cerrar extremos no usados
+      close(stdin_pipe[0]);   // No necesitamos leer del stdin pipe en el padre
+      close(stdout_pipe[1]);  // No necesitamos escribir en el stdout pipe
+      
+      // 1. ESCRIBIR DATOS AL MÓDULO (stdin del hijo)
+      std::cout << "[DEBUG] PARENT: Writing data to module's stdin..." << std::endl;
+      FILE* writePipe = fdopen(stdin_pipe[1], "w");
+      if (!writePipe) {
+        std::cout << "[-] Failed to open write pipe" << std::endl;
+        close(stdin_pipe[1]);
+        close(stdout_pipe[0]);
+        return;
+      }
+      
+      int items_sent = 0;
+      int formats_sent = 0;
+      
+      if (consumesFormat == "*") {
+        std::cout << "[DEBUG] PARENT: Sending ALL formats from storage" << std::endl;
+        for (const auto& [format, items] : storage) {
+          if (format == "__batch_format__") continue;
+          
+          std::cout << "[DEBUG] PARENT:   Format '" << format << "' has " 
+                    << items.size() << " items" << std::endl;
+          
+          if (items.empty()) continue;
+          
+          formats_sent++;
+          for (const auto& item : items) {
+            // Enviar cada item como JSON BMOP
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                    item.format.c_str(), item.value.c_str());
+            items_sent++;
+            
+            // Log cada 1000 items
+            if (items_sent % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Sent " << items_sent << " items so far..." << std::endl;
+            }
+          }
+        }
+      } else {
+        std::cout << "[DEBUG] PARENT: Sending specific format: '" << consumesFormat << "'" << std::endl;
+        auto it = storage.find(consumesFormat);
+        if (it != storage.end() && !it->second.empty()) {
+          formats_sent = 1;
+          for (const auto& item : it->second) {
+            fprintf(writePipe, "{\"t\":\"d\",\"f\":\"%s\",\"v\":\"%s\"}\n",
+                    item.format.c_str(), item.value.c_str());
+            items_sent++;
+          }
+        } else {
+          std::cout << "[DEBUG] PARENT: No data found for format '" << consumesFormat << "'" << std::endl;
+        }
+      }
+      
+      std::cout << "[DEBUG] PARENT: Finished writing. Total: " 
+                << items_sent << " items from " << formats_sent << " formats" << std::endl;
+      
+      // IMPORTANTE: Cerrar write pipe para indicar EOF al módulo
+      fflush(writePipe);
+      fclose(writePipe);
+      std::cout << "[DEBUG] PARENT: Write pipe closed (EOF sent to module)" << std::endl;
+      
+      // 2. LEER SALIDA DEL MÓDULO (stdout del hijo)
+      std::cout << "[DEBUG] PARENT: Reading module output from stdout..." << std::endl;
+      FILE* readPipe = fdopen(stdout_pipe[0], "r");
+      if (!readPipe) {
+        std::cout << "[-] Failed to open read pipe" << std::endl;
+        close(stdout_pipe[0]);
+        return;
+      }
+      
+      // Configuración para procesamiento de batch
+      char buffer[4096];
+      std::string lineBuffer;
+      std::string batchFormat;
+      bool inBatch = false;
+      int items_collected = 0;
+      int lines_read = 0;
+      
+      while (fgets(buffer, sizeof(buffer), readPipe)) {
+        lines_read++;
+        
+        // Mostrar salida en tiempo real
+        std::cout << buffer;
+        
+        // Procesar para capturar datos BMOP
+        std::string chunk(buffer);
+        lineBuffer += chunk;
+        
+        size_t pos;
+        while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+          std::string line = lineBuffer.substr(0, pos);
+          lineBuffer = lineBuffer.substr(pos + 1);
+          
+          line = trimString(line);
+          if (line.empty()) continue;
+          
+          // Línea es JSON (empieza con '{')
+          if (line[0] == '{') {
+            // Procesar con parseBMOPLine
+            parseBMOPLine(line, storage);
+            
+            // Verificar si es inicio de batch
+            if (!storage["__batch_format__"].empty()) {
+              inBatch = true;
+              batchFormat = storage["__batch_format__"][0].format;
+              storage["__batch_format__"].clear();
+              std::cout << "[DEBUG] PARENT: Batch START detected" << std::endl;
+              std::cout << "[DEBUG] PARENT: Batch format: " << batchFormat << std::endl;
+            }
+            // Verificar si es fin de batch
+            else if (line.find("batch_end") != std::string::npos) {
+              inBatch = false;
+              std::cout << "[DEBUG] PARENT: Batch END detected. Total collected: " 
+                        << storage[batchFormat].size() << " items" << std::endl;
+              batchFormat.clear();
+            }
+          }
+          // Línea dentro de batch (datos crudos)
+          else if (inBatch && !batchFormat.empty()) {
+            DataItem item;
+            item.format = batchFormat;
+            item.value = line;
+            storage[batchFormat].push_back(item);
+            items_collected++;
+            
+            // Log cada 1000 items recolectados
+            if (items_collected % 1000 == 0) {
+              std::cout << "[DEBUG] PARENT: Collected " << items_collected 
+                        << " items from batch" << std::endl;
+            }
+          }
+        }
+      }
+      
+      std::cout << "[DEBUG] PARENT: Finished reading module output" << std::endl;
+      std::cout << "[DEBUG] PARENT: Lines read: " << lines_read << std::endl;
+      std::cout << "[DEBUG] PARENT: Items collected: " << items_collected << std::endl;
+      
+      fclose(readPipe);
+      
+      // 3. ESPERAR A QUE EL MÓDULO TERMINE
+      std::cout << "[DEBUG] PARENT: Waiting for module to finish..." << std::endl;
+      int status;
+      waitpid(pid, &status, 0);
+      
+      if (WIFEXITED(status)) {
+        std::cout << "[DEBUG] PARENT: Module exited with status: " << WEXITSTATUS(status) << std::endl;
+      } else if (WIFSIGNALED(status)) {
+        std::cout << "[DEBUG] PARENT: Module terminated by signal: " << WTERMSIG(status) << std::endl;
+      }
+      
+      std::cout << "[DEBUG] PARENT: Data sent to module: " << items_sent << " items" << std::endl;
+      std::cout << "[DEBUG] PARENT: Data received from module: " << items_collected << " items" << std::endl;
+      
+    } else {
+      // Error en fork
+      std::cout << "[-] Fork failed" << std::endl;
+      close(stdin_pipe[0]);
+      close(stdin_pipe[1]);
+      close(stdout_pipe[0]);
+      close(stdout_pipe[1]);
+      return;
+    }
+  }
+  // ===================================================================
+  // 🔧 MÓDULOS QUE NO CONSUMEN DATOS (solo generan) - ¡ARREGLADO!
+  // ===================================================================
+  else {
+    std::cout << "[DEBUG] ====== MODULE GENERATES DATA ONLY ======" << std::endl;
+    
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+      std::cout << "[-] Failed to execute module" << std::endl;
+      return;
+    }
+    
+    char buffer[4096];
+    std::string lineBuffer;
+    std::string batchFormat;
+    bool inBatch = false;
+    int items_collected = 0;
+    int lines_read = 0;
+    
+    while (fgets(buffer, sizeof(buffer), pipe)) {
+      lines_read++;
+      
+      // Mostrar salida en tiempo real
+      std::cout << buffer;
+      
+      // Procesar para capturar datos BMOP
+      std::string chunk(buffer);
+      lineBuffer += chunk;
+      
+      size_t pos;
+      while ((pos = lineBuffer.find('\n')) != std::string::npos) {
+        std::string line = lineBuffer.substr(0, pos);
+        lineBuffer = lineBuffer.substr(pos + 1);
+        
+        line = trimString(line);
+        if (line.empty()) continue;
+        
+        // Línea es JSON (empieza con '{')
+        if (line[0] == '{') {
+          // ⭐⭐ PRIMERO: Procesar la línea JSON con parseBMOPLine
+          parseBMOPLine(line, storage);
+          
+          // ⭐⭐ SEGUNDO: Verificar si se inició un batch (checkeando storage["__batch_format__"])
+          if (!storage["__batch_format__"].empty()) {
+            inBatch = true;
+            batchFormat = storage["__batch_format__"][0].format;
+            storage["__batch_format__"].clear();
+            std::cout << "[DEBUG] Batch START detected. Format: " << batchFormat << std::endl;
+          }
+          // ⭐⭐ TERCERO: Verificar si es fin de batch (no se guarda en storage, solo es un marcador)
+          else if (line.find("batch_end") != std::string::npos) {
+            inBatch = false;
+            std::cout << "[DEBUG] Batch END detected. Total " << batchFormat 
+                      << " items: " << storage[batchFormat].size() << std::endl;
+            batchFormat.clear();
+          }
+        }
+        // ⭐⭐ Línea dentro de batch (datos crudos como "zxframework.org")
+        else if (inBatch && !batchFormat.empty()) {
+          // ¡GUARDAR EN STORAGE!
+          DataItem item;
+          item.format = batchFormat;
+          item.value = line;
+          storage[batchFormat].push_back(item);
+          items_collected++;
+          
+          if (items_collected % 1000 == 0) {
+            std::cout << "[DEBUG] Collected " << items_collected 
+                      << " " << batchFormat << " items so far..." << std::endl;
+          }
+        }
+        // Si no es JSON y no estamos en batch, ignorar (pero loguear para debug)
+        else if (!line.empty()) {
+          std::cout << "[DEBUG] Line ignored - Not JSON and not in batch: '" << line << "'" << std::endl;
+        }
+      }
+    }
+    
+    int pclose_status = pclose(pipe);
+    if (pclose_status != 0) {
+      std::cout << "[DEBUG] Module exited with non-zero status: " << pclose_status << std::endl;
+    }
+    
+    std::cout << "[DEBUG] Total lines read: " << lines_read << std::endl;
+    std::cout << "[DEBUG] Total items collected: " << items_collected << std::endl;
+  }
+  
+  // DEBUG: Mostrar storage después de ejecutar
+  std::cout << "[DEBUG] ====== END " << moduleName << " ======" << std::endl;
+  std::cout << "[DEBUG] After execution - storage contents:" << std::endl;
+  int total_items_after = 0;
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    std::cout << "[DEBUG]   " << format << ": " << items.size() << " items" << std::endl;
+    total_items_after += items.size();
+  }
+  std::cout << "[DEBUG] Total items in storage: " << total_items_after << std::endl;
+  std::cout << "[DEBUG] Net change: +" << (total_items_after - total_items_before) << " items" << std::endl;
+  
+  // Mostrar ejemplos de datos si hay muchos
+  for (const auto& [format, items] : storage) {
+    if (format == "__batch_format__") continue;
+    if (!items.empty()) {
+      std::cout << "[DEBUG] Sample of " << format << " items (first 3):" << std::endl;
+      for (size_t i = 0; i < std::min(items.size(), size_t(3)); i++) {
+        std::cout << "[DEBUG]   [" << i << "] " << items[i].value << std::endl;
+      }
+    }
+  }
+}
+
+
 
 void runModule(const std::string& moduleName, const std::vector<std::string>& args) {
   std::map<std::string, std::vector<DataItem>> dummyStorage;
@@ -683,6 +1895,7 @@ std::vector<std::string> loadProfile(const std::string& profileName) {
   file.close();
   return modules;
 }
+
 
 void runModulesFromProfile(const std::string& profileName, const std::vector<std::string>& args) {
   std::vector<std::string> modules = loadProfile(profileName);
