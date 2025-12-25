@@ -19,3 +19,4 @@
 - Ignore "log", "error", "result". TODO: Proper output
 - Check if modules scope are respected
 - Add insane amount of tests
+- Clean tests
