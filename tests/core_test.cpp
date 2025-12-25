@@ -1599,7 +1599,3 @@ csv.sh)");
   EXPECT_EQ(storage["subdomain"].size(), 12);
 }
 
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
-}

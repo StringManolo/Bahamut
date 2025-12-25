@@ -11,7 +11,7 @@
 - Expose / export internal core functions to user created ./modules to be able to make middlewares without breaking core encapsulation. For example to debug, log, test, mdofiy functions output format, etc from user careated modules.
 - Check make warnings
 - Track per module dependencies to make a selective purge in shared modules
-
+- ADD SESSIONS TO CONTINUE MODULE EXECUTION
 
 ### To docu:
 - Storage: add | replace | delete
@@ -21,9 +21,20 @@
 - Add insane amount of tests
 - Check tests:
 ```
-77 tests from 2 test suites ran. (301964 ms total)
-[  PASSED  ] 70 tests.
-[  FAILED  ] 7 tests, listed below:
+[----------] Global test environment tear-down
+[==========] 109 tests from 4 test suites ran. (484140 ms total)
+[  PASSED  ] 87 tests.
+[  FAILED  ] 22 tests, listed below:
+[  FAILED  ] BmopStderrTest.NodeModuleWithLogsAndData
+[  FAILED  ] BmopStderrTest.PythonModuleWithMixedOutput
+[  FAILED  ] BmopStderrTest.BashModuleWithStderrRedirect
+[  FAILED  ] BmopStderrTest.ErrorMessagesToStderr
+[  FAILED  ] BmopStderrTest.ProgressUpdatesOnlyOnStderr
+[  FAILED  ] BmopStderrTest.BatchModeWithLogs
+[  FAILED  ] BmopStderrTest.MixedBMOPMessagesCorrectSeparation
+[  FAILED  ] BmopStderrTest.ModuleWithFatalError
+[  FAILED  ] BmopStderrTest.RealTimeProgressMonitoring
+[  FAILED  ] BmopStderrTest.LogLevelsSeparation
 [  FAILED  ] BahamutTest.FindModulePathRecursive
 [  FAILED  ] BahamutTest.SetupPythonEnvironmentShared
 [  FAILED  ] BahamutTest.ComplexPipelineIntegration
@@ -31,5 +42,12 @@
 [  FAILED  ] BahamutTest.ModulePathResolution
 [  FAILED  ] BahamutTest.ProfileModuleNotFound
 [  FAILED  ] BahamutTest.CompleteSystemTest
+[  FAILED  ] PerformanceTest.CrossLanguageLargeDataProcessing
+[  FAILED  ] PerformanceTest.ProcessingPipelinePerformance
+[  FAILED  ] PerformanceTest.CrossLanguageComparison
+[  FAILED  ] PerformanceTest.StorageBehaviorPerformance
+[  FAILED  ] PerformanceTest.ComplexTransformationPipeline
+
+22 FAILED TESTS
 ```
 - Add more test
