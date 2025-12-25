@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Name: Get Bug Bounty Domains
-# Description: Extracts bug bounty target domains from multiple public sources (Chaos, GitHub lists, etc.)
+# Description: Extracts bug bounty target domains from multiple public sources (Chaos, GitHub lists, etc.) - Demo of python module
 # Type: collector-domain
 # Stage: 1
 # Provides: domain

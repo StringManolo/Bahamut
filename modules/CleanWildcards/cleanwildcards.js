@@ -6,6 +6,7 @@
 // Stage: 2
 // Consumes: domain
 // Provides: domain
+// Storage: replace
 // Install: 
 // InstallScope: global
 
@@ -33,6 +34,7 @@ process.stdin.on('data', chunk => {
         let domain = msg.v;
         inputCount++;
 
+        // shit parse. Example module. 
         if (domain.startsWith('*.')) domain = domain.substring(2);
         if (domain.startsWith('www.')) domain = domain.substring(4);
 

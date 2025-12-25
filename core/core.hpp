@@ -17,6 +17,7 @@ struct ModuleMetadata {
   int stage;
   std::string consumes;
   std::string provides;
+  std::string storageBehavior;
   std::string installCmd;
   std::string installScope;
 };

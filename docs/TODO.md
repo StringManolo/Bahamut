@@ -11,3 +11,11 @@
 - Expose / export internal core functions to user created ./modules to be able to make middlewares without breaking core encapsulation. For example to debug, log, test, mdofiy functions output format, etc from user careated modules.
 - Check make warnings
 - Track per module dependencies to make a selective purge in shared modules
+
+
+### To docu:
+- Storage: add | replace | delete
+- Fix: CleanWildcards example module
+- Ignore "log", "error", "result". TODO: Proper output
+- Check if modules scope are respected
+- Add insane amount of tests
