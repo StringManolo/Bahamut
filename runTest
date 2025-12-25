@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+TEST_DIR="tests"
+
+if [ -z "$1" ]; then
+  echo "Available tests:"
+  ls $TEST_DIR | grep "_test.cpp" | sed 's/_test.cpp//' | while read line; do
+    echo "  - $line"
+  done
+  exit 0
+fi
+
+TEST_NAME=$1
+FILE_PATH="${TEST_DIR}/${TEST_NAME}_test.cpp"
+
+if [ -f "$FILE_PATH" ]; then
+  echo "Running test: $TEST_NAME"
+  make test-single FILE="$FILE_PATH"
+else
+  echo "Error: Test '$TEST_NAME' not found at '$TEST_DIR'"
+  exit 1
+fi
