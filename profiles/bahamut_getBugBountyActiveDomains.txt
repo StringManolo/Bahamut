@@ -1,0 +1,12 @@
+# Bahamut Reconnaissance Profile
+# Author: https://github.com/StringManolo
+# Purpose: Get active domains for bug bounty
+
+# Get bug bounty domains from public sources
+getbugbountydomains.py
+
+# Then filter by DNS resolution
+filterunreachabledomains.js
+
+# Export all valid domains to ./output/domains.txt
+exportcsv.sh
