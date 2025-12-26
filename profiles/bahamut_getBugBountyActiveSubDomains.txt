@@ -8,5 +8,13 @@ getbugbountydomains.py
 # Then filter by DNS resolution
 filterunreachabledomains.js
 
-# Finally export all valid domains to ./output/domains.txt
+# Then find subdomains for each domain
+findsubdomainsbycertificate.js --debug
+
+# Then remove duplicates
+
+# Then remove wildcard from subdomains
+
+
+# Finally export all valid subdomains to ./output/domains.txt
 exportcsv.sh
