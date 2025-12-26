@@ -996,8 +996,8 @@ void runModule(const std::string& moduleName, const std::vector<std::string>& ar
   runModuleWithPipe(moduleName, args, dummyStorage, "");
 }
 
-std::vector<std::string> loadProfile(const std::string& profileName) {
-  std::vector<std::string> modules;
+std::vector<ProfileModule> loadProfile(const std::string& profileName) {
+  std::vector<ProfileModule> modules;
 
   std::string profilePath = PROFILES_DIR + "/bahamut_" + profileName + ".txt";
 
@@ -1021,15 +1021,59 @@ std::vector<std::string> loadProfile(const std::string& profileName) {
       continue;
     }
 
-    modules.push_back(trimmed);
+    ProfileModule module;
+
+    size_t firstSpace = trimmed.find(' ');
+
+    if (firstSpace == std::string::npos) {
+      module.moduleName = trimmed;
+    } else {
+      module.moduleName = trimmed.substr(0, firstSpace);
+
+      std::string argsStr = trimmed.substr(firstSpace + 1);
+      argsStr = trimString(argsStr);
+
+      if (!argsStr.empty()) {
+        bool inQuotes = false;
+        char quoteChar = '\0';
+        std::string currentArg;
+
+        for (size_t i = 0; i < argsStr.size(); ++i) {
+          char c = argsStr[i];
+
+          if ((c == '"' || c == '\'') && !inQuotes) {
+            inQuotes = true;
+            quoteChar = c;
+            currentArg += c;
+          } else if (c == quoteChar && inQuotes) {
+            inQuotes = false;
+            quoteChar = '\0';
+            currentArg += c;
+          } else if (c == ' ' && !inQuotes) {
+            if (!currentArg.empty()) {
+              module.args.push_back(currentArg);
+              currentArg.clear();
+            }
+          } else {
+            currentArg += c;
+          }
+        }
+
+        if (!currentArg.empty()) {
+          module.args.push_back(currentArg);
+        }
+      }
+    }
+
+    modules.push_back(module);
   }
 
   file.close();
   return modules;
 }
 
-void runModulesFromProfile(const std::string& profileName, const std::vector<std::string>& args) {
-  std::vector<std::string> modules = loadProfile(profileName);
+void runModulesFromProfile(const std::string& profileName, const std::vector<std::string>& globalArgs) {
+  std::vector<ProfileModule> modules = loadProfile(profileName);
 
   if (modules.empty()) {
     std::cout << "[-] No modules found in profile or profile doesn't exist" << std::endl;
@@ -1042,15 +1086,34 @@ void runModulesFromProfile(const std::string& profileName, const std::vector<std
   std::map<std::string, std::vector<DataItem>> storage;
   int count = 0;
 
-  for (const auto& moduleName : modules) {
-    std::string fullPath = findModulePath(moduleName);
+  for (const auto& profileModule : modules) {
+    std::string fullPath = findModulePath(profileModule.moduleName);
     if (fullPath.empty()) {
-      std::cout << "[-] Module not found: " << moduleName << std::endl;
+      std::cout << "[-] Module not found: " << profileModule.moduleName << std::endl;
       continue;
     }
 
     ModuleMetadata meta = parseModuleMetadata(fullPath);
-    runModuleWithPipe(moduleName, args, storage, meta.consumes);
+    
+    std::vector<std::string> combinedArgs;
+    
+    for (const auto& arg : profileModule.args) {
+      combinedArgs.push_back(arg);
+    }
+    
+    for (const auto& arg : globalArgs) {
+      combinedArgs.push_back(arg);
+    }
+    
+    if (!profileModule.args.empty()) {
+      std::cout << "[+] Module args: ";
+      for (const auto& arg : profileModule.args) {
+        std::cout << arg << " ";
+      }
+      std::cout << std::endl;
+    }
+    
+    runModuleWithPipe(profileModule.moduleName, combinedArgs, storage, meta.consumes);
     count++;
   }
 

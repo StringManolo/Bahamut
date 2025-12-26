@@ -23,6 +23,11 @@ struct ModuleMetadata {
   std::vector<std::string> argSpecs;
 };
 
+struct ProfileModule {
+  std::string moduleName;
+  std::vector<std::string> args;
+};
+
 void setDebugMode(bool enabled);
 bool isDebugEnabled();
 
@@ -46,7 +51,7 @@ void ensurePackageJson(const std::string& path);
 std::vector<std::string> getModules();
 std::string findModulePath(const std::string& moduleName);
 std::string getPythonVersion(const std::string& modulePath);
-std::vector<std::string> loadProfile(const std::string& profileName);
+std::vector<ProfileModule> loadProfile(const std::string& profileName); 
 void runModuleWithPipe(const std::string& moduleName, const std::vector<std::string>& args, std::map<std::string, std::vector<DataItem>>& storage, const std::string& consumesFormat);
 std::string setupNodeEnvironment(const std::string& fullPath, const std::string& scope, const std::string& moduleDir);
 std::string setupPythonEnvironment(const std::string& fullPath, const std::string& scope, const std::string& moduleDir);
