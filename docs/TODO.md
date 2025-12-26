@@ -12,6 +12,8 @@
 - Check make warnings
 - Track per module dependencies to make a selective purge in shared modules
 - ADD SESSIONS TO CONTINUE MODULE EXECUTION
+- Improve perfomance
+- Manage error, warns, etc from modules using BMOP
 
 ### To docu:
 - Storage: add | replace | delete
@@ -51,3 +53,5 @@
 22 FAILED TESTS
 ```
 - Add more test
+
+
