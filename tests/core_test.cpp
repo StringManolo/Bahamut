@@ -76,7 +76,8 @@ TEST_F(BahamutTest, FindModulePathNotFound) {
   EXPECT_TRUE(path.empty());
 }
 
-TEST_F(BahamutTest, FindModulePathRecursive) {
+// TODO: Good this test fails. Recursive Module Search is not implemented yet
+TEST_F(BahamutTest, FindModulePathRecursive) { 
   createTestModule("modules/collectors/deep/test.js", "console.log('deep');");
   
   std::string path = findModulePath("test.js");
@@ -228,9 +229,9 @@ module3.sh)");
   
   auto modules = loadProfile("test");
   EXPECT_EQ(modules.size(), 3);
-  EXPECT_EQ(modules[0], "module1.js");
-  EXPECT_EQ(modules[1], "module2.py");
-  EXPECT_EQ(modules[2], "module3.sh");
+  EXPECT_EQ(modules[0].moduleName, "module1.js");
+  EXPECT_EQ(modules[1].moduleName, "module2.py");
+  EXPECT_EQ(modules[2].moduleName, "module3.sh");
 }
 
 TEST_F(BahamutTest, LoadProfileNotFound) {
@@ -312,7 +313,7 @@ TEST_F(BahamutTest, SetupPythonEnvironmentShared) {
   fs::create_directories("modules/shared_deps/python_libs");
   
   std::string source = setupPythonEnvironment("modules/test.py", "shared", "modules");
-  EXPECT_EQ(source, "modules/shared_deps/python_libs");
+  EXPECT_EQ(source, "./modules/shared_deps/python_libs");
   
   char* python_path = std::getenv("PYTHONPATH");
   EXPECT_TRUE(python_path != nullptr);
@@ -646,7 +647,7 @@ module3.js)");
   
   auto modules = loadProfile("test_order");
   for (const auto& module : modules) {
-    runModuleWithPipe(module, {}, storage, "");
+    runModuleWithPipe(module.moduleName, {}, storage, "");
   }
   
   EXPECT_EQ(storage["order"].size(), 3);
@@ -749,11 +750,12 @@ console.log(JSON.stringify({t:"result",ok:true,count:1}));)";
   EXPECT_EQ(storage["test"][0].value, "value");
 }
 
+// TODO: Stablish default behavioir on core.cpp on how to gracefully handle errors
 TEST_F(BahamutTest, ModuleWithError) {
   std::string content = R"(#!/usr/bin/env node
 console.log(JSON.stringify({bmop:"1.0",module:"error"}));
 console.error(JSON.stringify({t:"error",code:"TEST",m:"Test error",fatal:true}));
-console.log(JSON.stringify({t:"result",ok:false,error":"Test error"}));
+console.log(JSON.stringify({t:"result",ok:false,error:"Test error"}));
 process.exit(1);)";
   
   createTestModule("modules/error.js", content);
@@ -874,9 +876,9 @@ module3.sh)");
   
   auto modules = loadProfile("comments");
   EXPECT_EQ(modules.size(), 3);
-  EXPECT_EQ(modules[0], "module1.js");
-  EXPECT_EQ(modules[1], "module2.py");
-  EXPECT_EQ(modules[2], "module3.sh");
+  EXPECT_EQ(modules[0].moduleName, "module1.js");
+  EXPECT_EQ(modules[1].moduleName, "module2.py");
+  EXPECT_EQ(modules[2].moduleName, "module3.sh");
 }
 
 TEST_F(BahamutTest, ModuleWithCustomDataFormats) {
@@ -1185,9 +1187,9 @@ second.js)");
   
   auto modules = loadProfile("integration");
   for (const auto& module : modules) {
-    std::string path = findModulePath(module);
+    std::string path = findModulePath(module.moduleName);
     ModuleMetadata meta = parseModuleMetadata(path);
-    runModuleWithPipe(module, {}, storage, meta.consumes);
+    runModuleWithPipe(module.moduleName, {}, storage, meta.consumes);
   }
   
   EXPECT_EQ(storage["output"].size(), 1);
@@ -1351,11 +1353,11 @@ console.log(JSON.stringify({t:"result",ok:true,count:0}));)";
   
   testing::internal::CaptureStdout();
   auto modules = loadProfile("missing");
-  for (const auto& moduleName : modules) {
-    std::string path = findModulePath(moduleName);
+  for (const auto& module : modules) {
+    std::string path = findModulePath(module.moduleName);
     if (!path.empty()) {
       ModuleMetadata meta = parseModuleMetadata(path);
-      runModuleWithPipe(moduleName, {}, storage, meta.consumes);
+      runModuleWithPipe(module.moduleName, {}, storage, meta.consumes);
     }
   }
   std::string output = testing::internal::GetCapturedStdout();
@@ -1568,9 +1570,9 @@ csv.sh)");
   
   auto modules = loadProfile("full_workflow");
   for (const auto& module : modules) {
-    std::string path = findModulePath(module);
+    std::string path = findModulePath(module.moduleName);
     ModuleMetadata meta = parseModuleMetadata(path);
-    runModuleWithPipe(module, {}, storage, meta.consumes);
+    runModuleWithPipe(module.moduleName, {}, storage, meta.consumes);
   }
   
   EXPECT_TRUE(fs::exists("domains.csv"));
