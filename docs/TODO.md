@@ -7,7 +7,7 @@
 - Implement management of the info,logs,warns,errors and criticals by the engine
 - Add --profiles to `bahamut list`
 - Allow multiple consumes
-- 
+
 
 - Encapsulate modules in each folder
 - Normalice input and output from modules (add a 4 modules in different languages to test)
@@ -23,6 +23,7 @@
 - ADD SESSIONS TO CONTINUE MODULE EXECUTION
 - Improve perfomance
 - Manage error, warns, etc from modules using BMOP
+- Github Actions workflow to compile the cpp bin for every single arch and lib (for example weird ones like android/tv + armeabiv7 + musl) or mayor version push and auto push the release with change logs after first estable 1.0 ship
 
 ### To docu:
 - Storage: add | replace | delete
