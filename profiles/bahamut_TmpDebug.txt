@@ -2,24 +2,15 @@
 # Author: https://github.com/StringManolo
 # Purpose: Get active subdomains for bug bounty
 
-# Get bug bounty domains from public sources
-getbugbountydomains.py
-
-# Then filter by DNS resolution
-filterunreachabledomains.js
-
-# Get a list of HTTP proxies
-gethttpproxylist.py
-
-# Get the active HTTP proxies
-filtervalidhttpproxies.js
+tmpdomain.sh
+tmpproxy.sh
 
 # Then find subdomains for each domain using proxies to avoid rate limit
-findsubdomainsbycertificate.js --debug --use-http-proxies
+findsubdomainsbycertificate.js --debug --use-http-proxies --proxy-insecure
 
 # Then remove duplicates
 
 # Then remove wildcard from subdomains
 
 # Finally export all valid subdomains to ./output/domains.txt
-exportcsv.sh
+# exportcsv.sh

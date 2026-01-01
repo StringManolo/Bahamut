@@ -1,0 +1,9 @@
+{
+  "name": "bahamut-module",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^2.7.0",
+    "psl": "^1.15.0"
+  }
+}

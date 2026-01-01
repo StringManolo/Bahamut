@@ -1,5 +1,14 @@
 # TODO
 
+### Priority
+- FIX MODULES. (critical):
+  Test and fix modules isolation, install (1by1, and by profile), uninstall, purge, reinstall, update, wrong detectections of dependencies, etc.
+- Make solid getSubdomains profile
+- Implement management of the info,logs,warns,errors and criticals by the engine
+- Add --profiles to `bahamut list`
+- Allow multiple consumes
+- 
+
 - Encapsulate modules in each folder
 - Normalice input and output from modules (add a 4 modules in different languages to test)
 - Create reports module

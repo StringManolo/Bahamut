@@ -11,8 +11,13 @@
 // Install: npm install axios
 // RateLimit: 50
 // Timeout: 5000
+// Args: --secure (flag, optional) Enable secure mode (HTTPS) with port adjustment
 
 const axios = require('axios');
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const secureMode = args.includes('--secure');
 
 console.log(JSON.stringify({bmop:"1.0",module:"proxy-validator",pid:process.pid}));
 
@@ -67,39 +72,68 @@ let globalStartTime = Date.now();
 let completedBatches = 0;
 
 const testProxy = async (proxy) => {
-  const [ip, port] = proxy.split(':');
-  
-  try {
-    const response = await axios.get('http://example.com', {
-      proxy: {
-        protocol: 'http',
-        host: ip,
-        port: parseInt(port)
-      },
-      timeout: 5000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
-      }
-    });
-    
-    if (response.status === 200 && response.data.includes('<title>Example Domain</title>')) {
-      return { proxy, status: 'working' };
+  const [ip, originalPort] = proxy.split(':');
+  const port = parseInt(originalPort);
+
+  // Determine ports to test based on secure mode
+  const portsToTest = [];
+  if (!secureMode) {
+    // Original behavior: test only the original port with HTTP
+    portsToTest.push(port);
+  } else {
+    // Secure mode: adjust ports for HTTPS
+    if (port === 80) {
+      portsToTest.push(443); // HTTP default -> HTTPS default
+    } else if (port === 8000) {
+      portsToTest.push(8443); // Common HTTP alt -> HTTPS alt
     } else {
-      return { proxy, status: 'dead' };
+      portsToTest.push(port); // Try original port first
+      if (port !== 443) {
+        portsToTest.push(443); // Then try default HTTPS port
+      }
     }
-  } catch (err) {
-    return { proxy, status: 'dead' };
   }
+
+  const url = secureMode ? 'https://example.com' : 'http://example.com';
+
+  // Try each port in order
+  for (const testPort of portsToTest) {
+    try {
+      const response = await axios.get(url, {
+        proxy: {
+          protocol: 'http',
+          host: ip,
+          port: testPort
+        },
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+        }
+      });
+
+      if (response.status === 200 && response.data.includes('<title>Example Domain</title>')) {
+        // If we used a different port than original, return proxy with adjusted port
+        const workingProxy = testPort === port ? proxy : `${ip}:${testPort}`;
+        return { proxy: workingProxy, status: 'working' };
+      }
+    } catch (err) {
+      // This port failed, try the next one
+      continue;
+    }
+  }
+
+  // All ports failed
+  return { proxy, status: 'dead' };
 };
 
 const processBatch = async (proxies, batchNumber) => {
   const batchSize = proxies.length;
   const batchStartTime = Date.now();
-  
+
   console.error(JSON.stringify({
     t: "log",
     l: "info",
-    m: `Processing batch ${batchNumber} (${batchSize} proxies)`
+    m: `Processing batch ${batchNumber} (${batchSize} proxies)${secureMode ? ' in SECURE mode' : ''}`
   }));
 
   const tasks = proxies.map(proxy => () => testProxy(proxy));
@@ -111,10 +145,10 @@ const processBatch = async (proxies, batchNumber) => {
 
   const batchWorking = workingProxies.length;
   const batchDead = results.length - batchWorking;
-  
+
   const batchTime = Date.now() - batchStartTime;
   const batchSpeed = batchTime > 0 ? Math.round(batchSize / (batchTime / 1000)) : 0;
-  
+
   console.error(JSON.stringify({
     t: "log",
     l: "info",
@@ -150,11 +184,11 @@ process.stdin.on('data', chunk => {
       if (msg.t === 'd' && msg.f === 'httpproxy') {
         inputCount++;
         const proxy = msg.v.trim();
-        
         if (proxy && proxy.includes(':')) {
           processingQueue.push(proxy);
         }
       } else if (msg.t === 'batch_end') {
+        // No action needed
       }
     } catch (e) {
       jsonErrors++;
@@ -171,7 +205,7 @@ process.stdin.on('end', async () => {
   console.error(JSON.stringify({
     t: "log",
     l: "info",
-    m: `Input complete: ${inputCount} total proxies, ${processingQueue.length} in queue`
+    m: `Input complete: ${inputCount} total proxies, ${processingQueue.length} in queue${secureMode ? ' (SECURE mode)' : ''}`
   }));
 
   totalBatches = Math.ceil(processingQueue.length / 500);
@@ -182,24 +216,24 @@ process.stdin.on('end', async () => {
   }));
 
   let batchNumber = 0;
-  
+
   while (processingQueue.length > 0) {
     batchNumber++;
     const batchSize = Math.min(500, processingQueue.length);
     const batch = processingQueue.splice(0, batchSize);
-    
+
     const result = await processBatch(batch, batchNumber);
-    
+
     workingCount += result.working;
     deadCount += result.dead;
     completedBatches++;
-    
+
     if (batchNumber % 10 === 0) {
       const elapsedTime = Date.now() - globalStartTime;
       const processedSoFar = (workingCount + deadCount);
       const globalProgress = Math.round((processedSoFar / inputCount) * 100);
       const globalSpeed = elapsedTime > 0 ? Math.round(processedSoFar / (elapsedTime / 1000)) : 0;
-      
+
       console.error(JSON.stringify({
         t: "log",
         l: "info",
@@ -211,13 +245,13 @@ process.stdin.on('end', async () => {
   const totalTime = Date.now() - globalStartTime;
   const successRate = inputCount > 0 ? Math.round((workingCount / inputCount) * 100) : 0;
   const avgSpeed = totalTime > 0 ? Math.round(inputCount / (totalTime / 1000)) : 0;
-  
+
   console.error(JSON.stringify({
     t: "log",
     l: "info",
-    m: `Validation completed in ${Math.round(totalTime/1000)}s`
+    m: `Validation completed in ${Math.round(totalTime/1000)}s${secureMode ? ' (SECURE mode)' : ''}`
   }));
-  
+
   console.error(JSON.stringify({
     t: "log",
     l: "info",
@@ -235,7 +269,8 @@ process.stdin.on('end', async () => {
       jsonErrors: jsonErrors,
       successRate: successRate,
       totalTime: totalTime,
-      avgSpeed: avgSpeed
+      avgSpeed: avgSpeed,
+      secureMode: secureMode
     }
   }));
 });
@@ -243,19 +278,19 @@ process.stdin.on('end', async () => {
 process.on('SIGINT', () => {
   const elapsedTime = Date.now() - globalStartTime;
   const processedSoFar = workingCount + deadCount;
-  
+
   console.error(JSON.stringify({
     t: "log",
     l: "info",
     m: "Process interrupted by user"
   }));
-  
+
   console.error(JSON.stringify({
     t: "log",
     l: "info",
-    m: `Progress: ${processedSoFar}/${inputCount} processed, ${workingCount} working, ${deadCount} dead in ${Math.round(elapsedTime/1000)}s`
+    m: `Progress: ${processedSoFar}/${inputCount} processed, ${workingCount} working, ${deadCount} dead in ${Math.round(elapsedTime/1000)}s${secureMode ? ' (SECURE mode)' : ''}`
   }));
-  
+
   process.exit(0);
 });
 
@@ -265,6 +300,6 @@ process.on('uncaughtException', (err) => {
     l: "error",
     m: `Uncaught exception: ${err.message}`
   }));
-  
+
   process.exit(1);
 });
