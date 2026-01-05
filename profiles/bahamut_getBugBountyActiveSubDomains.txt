@@ -9,13 +9,13 @@ getbugbountydomains.py
 filterunreachabledomains.js
 
 # Get a list of HTTP proxies
-gethttpproxylist.py
+# gethttpproxylist.py
 
 # Get the active HTTP proxies
-filtervalidhttpproxies.js
+# filtervalidhttpproxies.js
 
-# Then find subdomains for each domain using proxies to avoid rate limit
-findsubdomainsbycertificate.js --debug --use-http-proxies
+# Then find subdomains for each domain 
+findsubdomainsbycertificate.js 
 
 # Then remove duplicates
 
