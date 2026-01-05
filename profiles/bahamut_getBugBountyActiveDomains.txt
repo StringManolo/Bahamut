@@ -8,5 +8,5 @@ getbugbountydomains.py
 # Then filter by DNS resolution
 filterunreachabledomains.js
 
-# Export all valid domains to ./output/domains.txt
+# Finally export all valid domains to ./output/domains.txt
 exportcsv.sh

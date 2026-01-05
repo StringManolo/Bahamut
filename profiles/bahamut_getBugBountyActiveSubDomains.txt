@@ -1,0 +1,25 @@
+# Bahamut Reconnaissance Profile
+# Author: https://github.com/StringManolo
+# Purpose: Get active subdomains for bug bounty
+
+# Get bug bounty domains from public sources
+getbugbountydomains.py
+
+# Then filter by DNS resolution
+filterunreachabledomains.js
+
+# Get a list of HTTP proxies
+# gethttpproxylist.py
+
+# Get the active HTTP proxies
+# filtervalidhttpproxies.js
+
+# Then find subdomains for each domain 
+findsubdomainsbycertificate.js 
+
+# Then remove duplicates
+
+# Then remove wildcard from subdomains
+
+# Finally export all valid subdomains to ./output/domains.txt
+exportcsv.sh

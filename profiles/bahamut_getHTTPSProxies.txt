@@ -1,0 +1,12 @@
+# Bahamut Reconnaissance Profile
+# Author: https://github.com/StringManolo
+# Purpose: Get active HTTPS proxies
+
+# Get a list of HTTP proxies
+gethttpproxylist.py
+
+# Get the active HTTPS proxies
+filtervalidhttpproxies.js --secure
+
+# Finally export all valid HTTPS proxies to ./output/httpproxy.txt
+exportcsv.sh
